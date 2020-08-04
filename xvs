@@ -25,11 +25,11 @@ if [[ ! $(command -v install) ]] ; then echo "Error: 'install' not installed." ;
 if [[ ! $(command -v ffmpeg) ]] ; then echo "Error: 'ffmpeg' not installed." ; exit 1 ; fi
 if [[ ! $(command -v ffprobe) ]] ; then echo "Error: 'ffprobe' not installed." ; exit 1 ; fi
 
-###############################################################################
+###################################################################################################
 # Delete temp files from the directory where the script has been executed.
 # Globals/Constants:
 #   CURRENT_DIR
-###############################################################################
+###################################################################################################
 _trap_cleanup() {
 	echo "Oops! $(basename $(0)) ($$) has terminated."
 	echo "Cleaning temporary files..."
@@ -39,9 +39,9 @@ _trap_cleanup() {
 }
 trap '_trap_cleanup' SIGHUP SIGINT SIGQUIT SIGQUIT SIGTERM
 
-###############################################################################
+###################################################################################################
 # Show help.
-###############################################################################
+###################################################################################################
 _show_help() {
 cat <<HELP
 Usage: 
