@@ -17,6 +17,14 @@ set -o errexit # Exit script when command fails. Add '|| true' to allow fail.
 readonly CURRENT_DIR="$PWD"
 readonly SCRIPT_NAME=$(basename $0)
 
+# Check if necessary commands are installed
+# -----------------------------------------
+if [[ ! $(command -v cryptsetup) ]] ; then echo "'Error: 'cryptsetup' not installed." ; exit 1 ; fi
+if [[ ! $(command -v fuser) ]] ; then echo "Error: 'fuser' not installed." ; exit 1 ; fi
+if [[ ! $(command -v install) ]] ; then echo "Error: 'install' not installed." ; 	exit 1 ; fi
+if [[ ! $(command -v ffmpeg) ]] ; then echo "Error: 'ffmpeg' not installed." ; exit 1 ; fi
+if [[ ! $(command -v ffprobe) ]] ; then echo "Error: 'ffprobe' not installed." ; exit 1 ; fi
+
 ###############################################################################
 # Delete temp files from the directory where the script has been executed.
 # Globals/Constants:
@@ -31,3 +39,29 @@ _trap_cleanup() {
 }
 trap '_trap_cleanup' SIGHUP SIGINT SIGQUIT SIGQUIT SIGTERM
 
+###############################################################################
+# Show help.
+###############################################################################
+_show_help() {
+cat <<HELP
+Usage: 
+ ${SCRIPT_NAME} [option]... <argument>
+
+Options:
+ -h        Show this help.
+ -m <dir>  Mount LUKS partition.
+           x -> xvd
+           n -> nvd
+HELP
+}
+
+
+while getopts ":hm:u:" opt ; do
+	case $opt in
+		h) _show_help ;;
+		m) _mount_dir "$OPTARG" ;;
+		u) _umount_dir "$OPTARG" ;;
+		:) echo "Error: -$OPTARG requires an argument" ; exit 1 ;;
+		?) echo "Error: unknown option -$OPTARG" ; exit 1 ;;
+	esac
+done
