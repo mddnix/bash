@@ -30,7 +30,3 @@ _trap_cleanup() {
 	exit 2
 }
 trap '_trap_cleanup' SIGHUP SIGINT SIGQUIT SIGQUIT SIGTERM
-
-_to_lower "MADhU d desAI"
-_to_upper "MADhU d desAI"
-_to_pascal "MADhU d desAI"
