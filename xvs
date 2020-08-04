@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Script Name : xvs
-# Description : Provides various functions to manipulate a video file.
+# Description : Provides various features to manipulate a video file.
 # Args        : Refer HELP section for usage.
 # Author      : Madhusudhan D Desai
 # Email       : mddnix@gmail.com
@@ -16,7 +16,6 @@ set -o errexit # Exit script when command fails. Add '|| true' to allow fail.
 # ------------------
 readonly CURRENT_DIR="$PWD"
 readonly SCRIPT_NAME=$(basename $0)
-
 
 ###############################################################################
 # Delete temp files from the directory where the script has been executed.
