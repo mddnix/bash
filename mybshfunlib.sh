@@ -62,3 +62,18 @@ _to_pascal() {
 		| sed 's/\([a-z]\)\([a-zA-Z0-9]*\)/\u\1\2/g')"
 	echo "${output}"
 }
+
+
+###############################################################################
+# Draws a line based on use selected character.
+# Arguments:
+#   $1: Symbol type.
+#   $2: (optional) length to print.
+# Return:
+#   echo repeated characters by specified length.
+###############################################################################
+_draw_line() {
+	symbol="$1"
+	length=${2:-$(tput cols)}
+	printf "%${length}s\n"|tr " " "${symbol}"
+}
