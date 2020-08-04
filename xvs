@@ -19,11 +19,11 @@ readonly SCRIPT_NAME=$(basename $0)
 
 # Check if necessary commands are installed
 # -----------------------------------------
-if [[ ! $(command -v cryptsetup) ]] ; then echo "'Error: 'cryptsetup' not installed." ; exit 1 ; fi
-if [[ ! $(command -v fuser) ]] ; then echo "Error: 'fuser' not installed." ; exit 1 ; fi
-if [[ ! $(command -v install) ]] ; then echo "Error: 'install' not installed." ; 	exit 1 ; fi
-if [[ ! $(command -v ffmpeg) ]] ; then echo "Error: 'ffmpeg' not installed." ; exit 1 ; fi
-if [[ ! $(command -v ffprobe) ]] ; then echo "Error: 'ffprobe' not installed." ; exit 1 ; fi
+_is_cmd "cryptsetup"
+_is_cmd "fuser"
+_is_cmd "install"
+_is_cmd "ffmpeg"
+_is_cmd "ffprobe"
 
 ###################################################################################################
 # Delete temp files from the directory where the script has been executed.
