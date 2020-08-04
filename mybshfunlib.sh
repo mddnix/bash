@@ -8,7 +8,7 @@
 ###############################################################################
 # Checks if file exists.
 # Arguments:
-#   #1: Filename
+#   $1: Filename
 # Return:
 #   2, if file does not exist.
 ###############################################################################
@@ -23,9 +23,9 @@ _is_file() {
 ###############################################################################
 # Change case to lower.
 # Arguments:
-#   #1: Variable content.
+#   $1: Variable content.
 # Return:
-#   echo content of #1 in lower case.
+#   echo content of $1 to lower case.
 ###############################################################################
 _to_lower() {
 	local input="$1"
@@ -37,12 +37,28 @@ _to_lower() {
 ###############################################################################
 # Change case to upper.
 # Arguments:
-#   #1: Variable content.
+#   $1: Variable content.
 # Return:
-#   echo content of #1 in upper case.
+#   echo content of $1 to upper case.
 ###############################################################################
 _to_upper() {
 	local input="$1"
 	local output="$(echo $1 | tr [a-z] [A-Z])"
+	echo "${output}"
+}
+
+
+###############################################################################
+# Change case to pascal.
+# Arguments:
+#   $1: Variable content.
+# Return:
+#   echo content of $1 to pascal case.
+###############################################################################
+_to_pascal() {
+	local input="$1"
+	local to_lower="$(_to_lower "$1")"
+	local output="$(echo ${to_lower} \
+		| sed 's/\([a-z]\)\([a-zA-Z0-9]*\)/\u\1\2/g')"
 	echo "${output}"
 }
