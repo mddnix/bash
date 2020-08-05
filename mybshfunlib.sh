@@ -88,5 +88,3 @@ _is_cmd() {
 		exit 1
 	fi
 }
-
-

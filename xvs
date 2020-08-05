@@ -16,6 +16,14 @@ set -o errexit # Exit script when command fails. Add '|| true' to allow fail.
 # ------------------
 readonly CURRENT_DIR="$PWD"
 readonly SCRIPT_NAME=$(basename $0)
+readonly XDIR="/xd"
+readonly NDIR="/nd"
+readonly XDEV="/dev/sda4"
+readonly NDEV="/dev/sda8"
+readonly XMAP="XDDM"
+readonly NMAP="NDDM"
+readonly XUSR="neon"
+readonly NUSR="neon"
 
 # Check if necessary commands are installed
 # -----------------------------------------
@@ -55,8 +63,68 @@ Options:
 HELP
 }
 
+###################################################################################################
+# Mounts the LUKS partition into a directory. Creates directory if necessary.
+# Globals/Constants:
+#   XDEV, XDIR, XMAP, XUSR, NDEV, NDIR, NMAP, NUSR
+###################################################################################################
+_mount_dir() {
 
+	# Check $1 positional argument. If para is other than 'x' or 'n', exit script.
+	if [[ "$1" = "x" ]] ; then
+		local dev_name="${XDEV}"
+		local dir_name="${XDIR}"
+		local map_name="${XMAP}"
+		local usr_name="${XUSR}"
+	elif [[ "$1" = "n" ]] ; then
+		local dev_name="${NDEV}"
+		local dir_name="${NDIR}"
+		local map_name="${NMAP}"
+		local usr_name="${NUSR}"
+	else
+		echo "Couldn't find mount code... exiting."
+		exit 1
+	fi
+
+	# Check if mount directory exist. If not, create it.
+	if [[ ! -d "${dir_name}" ]] ; then
+		echo "Folder '${dir_name}' does not exist. Creating it..."
+		sudo install -o "${usr_name}" -g "${usr_name}" -m 0770 -d "${dir_name}"
+		if [[ $? -eq 0 ]] ; then
+			echo "...Done." 
+		else 
+			echo "Error: Couldn't create folder ${dir_name}."
+			exit 1
+		fi
+	fi
+
+	# Mount LUKS partition
+	if [[ $(findmnt -M "${dir_name}") ]] ; then
+		echo "${dir_name} already mounted with ${dev_name}. Doing nothing."
+		exit 1
+	else
+		echo "Mounting ${dev_name} into ${dir_name} ..."
+		sudo cryptsetup open --type luks2 "${dev_name}" "${map_name}"
+		sudo mount "/dev/mapper/${map_name}" "${dir_name}"
+		if [[ $? -eq 0 ]] ; then
+			echo "${dir_name} mounted. Ready to use."
+		else
+			echo "Error: Couldn't mount ${dir_name}... Exiting."
+			exit 1
+		fi
+	fi
+
+
+
+}
+
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%% Main Function
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 while getopts ":hm:u:" opt ; do
+	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
 		h) _show_help ;;
 		m) _mount_dir "$OPTARG" ;;
