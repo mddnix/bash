@@ -88,12 +88,12 @@ _mount_dir() {
 
 	# Check if mount directory exist. If not, create it.
 	if [[ ! -d "${dir_name}" ]] ; then
-		echo "Folder '${dir_name}' does not exist. Creating it..."
+		echo "Directory '${dir_name}' does not exist. Creating it..."
 		sudo install -o "${usr_name}" -g "${usr_name}" -m 0770 -d "${dir_name}"
 		if [[ $? -eq 0 ]] ; then
 			echo "...Done." 
 		else 
-			echo "Error: Couldn't create folder ${dir_name}."
+			echo "Error: Couldn't create directory ${dir_name}."
 			exit 1
 		fi
 	fi
@@ -141,27 +141,32 @@ _umount_dir() {
 		exit 1
 	fi
 
-	# Check if directory is already mounted.
-	if [[ $(findmnt -M "${dir_name}") ]] ; then
-		echo "xd mounted"
-		if [[ $(sudo fuser -v --mount "${dir_name}") ]] ; then
-			echo
-			echo "c  current directory."
-			echo "e  executable being run."
-			echo "f  open file. f is omitted in default display mode."
-			echo "F  open file for writing. F is omitted in default display mode."
-			echo "r  root directory."
-			echo "m  mmap'ed file or shared library."
-			echo
-			echo "${dir_name} is NOT UN-MOUNTED. Resolve issues and try again."
-			exit 1
-		else
-			echo "Code for unounting"
-		fi
+	# Check if are unmounting from source directory.
+	if [[ "$(echo $PWD)" = "${dir_name}" ]] ; then
+		echo "You are trying to unmount ${dir_name} from within. Please change directory first, then try again."
+		exit 1
 	fi
 
+	# Check if directory is already mounted.
+	if [[ $(findmnt -M "${dir_name}") ]] ; then
+		echo "Unmounting ${dir_name}..."
 
-
+		# Check if the mount directory is busy
+		if [[ $(sudo fuser --mount "${dir_name}") ]] ; then
+			sudo fuser -kvi "${dir_name}"
+		fi
+		
+		# Lazy umount the directory, then, if successful, close LUKS
+		sudo umount -l "${dir_name}"
+		if [[ $? -eq 0 ]] ; then
+			sudo cryptsetup close "${map_name}"
+			if [[ $? -eq 0 ]] ; then
+				echo ""${dir_name}" unmounted.. Done."
+			fi
+		fi
+	else
+		echo "${dir_name} not mounted. Doing nothing."
+	fi
 }
 
 
