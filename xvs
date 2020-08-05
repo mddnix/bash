@@ -118,6 +118,51 @@ _mount_dir() {
 
 }
 
+###################################################################################################
+# Unmounts the LUKS partition from a directory.
+# Globals/Constants:
+#   XDEV, XDIR, XMAP, XUSR, NDEV, NDIR, NMAP, NUSR
+###################################################################################################
+_umount_dir() {
+
+	# Check $1 positional argument. If para is other than 'x' or 'n', exit script.
+	if [[ "$1" = "x" ]] ; then
+		local dev_name="${XDEV}"
+		local dir_name="${XDIR}"
+		local map_name="${XMAP}"
+		local usr_name="${XUSR}"
+	elif [[ "$1" = "n" ]] ; then
+		local dev_name="${NDEV}"
+		local dir_name="${NDIR}"
+		local map_name="${NMAP}"
+		local usr_name="${NUSR}"
+	else
+		echo "Couldn't find mount code... exiting."
+		exit 1
+	fi
+
+	# Check if directory is already mounted.
+	if [[ $(findmnt -M "${dir_name}") ]] ; then
+		echo "xd mounted"
+		if [[ $(sudo fuser -v --mount "${dir_name}") ]] ; then
+			echo
+			echo "c  current directory."
+			echo "e  executable being run."
+			echo "f  open file. f is omitted in default display mode."
+			echo "F  open file for writing. F is omitted in default display mode."
+			echo "r  root directory."
+			echo "m  mmap'ed file or shared library."
+			echo
+			echo "${dir_name} is NOT UN-MOUNTED. Resolve issues and try again."
+			exit 1
+		else
+			echo "Code for unounting"
+		fi
+	fi
+
+
+
+}
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
