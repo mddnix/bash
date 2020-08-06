@@ -70,7 +70,9 @@ HELP
 ###################################################################################################
 _mount_dir() {
 
-	# Check $1 positional argument. If para is other than 'x' or 'n', exit script.
+	###### Check if $1 has correct values - x or n.
+	## (T) Parameter is 'x' or 'n'. Assign constant values to local variables.
+	## (F) Parameter is other than 'x' or 'n'. Exit script with an error message.
 	if [[ "$1" = "x" ]] ; then
 		local dev_name="${XDEV}"
 		local dir_name="${XDIR}"
@@ -86,10 +88,12 @@ _mount_dir() {
 		exit 1
 	fi
 
-	# Check if mount directory exist. If not, create it.
+	###### Check if mount directory already (not) exist.
+	## (T) Create a directory then apply username, groupname and perm 0770 to that directory.
+	## (F) Do nothing.
 	if [[ ! -d "${dir_name}" ]] ; then
 		echo "Directory '${dir_name}' does not exist. Creating it..."
-		sudo install -o "${usr_name}" -g "${usr_name}" -m 0770 -d "${dir_name}"
+		sudo install -o "${usr_name}" -g "${usr_name}" -m 0770 -d "${dir_name}" # Create dirctory.
 		if [[ $? -eq 0 ]] ; then
 			echo "...Done." 
 		else 
@@ -98,29 +102,28 @@ _mount_dir() {
 		fi
 	fi
 
-	# Mount LUKS partition
+	###### Check if LUKS device already mounted into a directory.
+	## (T) Print an error message and do nothing.
+	## (F) Open LUKS device and mount it into a directory.
 	if [[ $(findmnt -M "${dir_name}") ]] ; then
 		echo "${dir_name} already mounted with ${dev_name}. Doing nothing."
 		exit 1
 	else
+		# Check if are in mount directory.
+		if [[ "$(echo $PWD)" = "${dir_name}" ]] ; then # You are inside mount point is TRUE. 
+			echo "You are inside the mount directory ${dir_name}. Change directory and try again."
+			exit 1
+		fi
 		echo "Mounting ${dev_name} into ${dir_name} ..."
-		sudo cryptsetup open --type luks2 "${dev_name}" "${map_name}"
-		sudo mount "/dev/mapper/${map_name}" "${dir_name}"
+		sudo cryptsetup open --type luks2 "${dev_name}" "${map_name}" # Open LUKS device.
+		sudo mount "/dev/mapper/${map_name}" "${dir_name}" # Mount LUKS device in a directory.
 		if [[ $? -eq 0 ]] ; then
-			if [[ "$(echo $PWD)" = "${dir_name}" ]] ; then
-				echo "Inside directory"
-				cd /tmp
-				cd -
-			fi
 			echo "${dir_name} mounted. Ready to use."
 		else
 			echo "Error: Couldn't mount ${dir_name}... Exiting."
 			exit 1
 		fi
 	fi
-
-
-
 }
 
 ###################################################################################################
@@ -130,7 +133,9 @@ _mount_dir() {
 ###################################################################################################
 _umount_dir() {
 
-	# Check $1 positional argument. If para is other than 'x' or 'n', exit script.
+	###### Check if $1 has correct values - x or n.
+	## (T) Parameter is 'x' or 'n'. Assign constant values to local variables.
+	## (F) Parameter is other than 'x' or 'n'. Exit script with an error message.
 	if [[ "$1" = "x" ]] ; then
 		local dev_name="${XDEV}"
 		local dir_name="${XDIR}"
@@ -148,34 +153,27 @@ _umount_dir() {
 
 	# Check if are unmounting from source directory.
 	if [[ "$(echo $PWD)" = "${dir_name}" ]] ; then
-		echo "1 $PWD"
-		echo "You are trying to unmount ${dir_name} from within. Please change directory first, then try again."
-		#exit 1
-		cd /tmp
-		echo "2 $PWD"
+		echo "You are inside to-be un-mount directory ${dir_name}. Change directory and try again."
+		exit 1
 	fi
 
-	# Check if directory is already mounted.
+	###### Check if directory is already mounted.
+	## (T) Un-Mount directory.
+	## (F) Print an error message and do nothing.
 	if [[ $(findmnt -M "${dir_name}") ]] ; then
 		echo "Unmounting ${dir_name}..."
 
 		# Check if the mount directory is busy
 		if [[ $(sudo fuser --mount "${dir_name}") ]] ; then
-			sudo fuser -kvi "${dir_name}"
+			sudo fuser -kvi "${dir_name}" # Kill all busy processes interactively.
 		fi
 		
 		# Lazy umount the directory, then, if successful, close LUKS
 		sudo umount -l "${dir_name}"
 		if [[ $? -eq 0 ]] ; then
-			sudo cryptsetup close "${map_name}"
+			sudo cryptsetup close "${map_name}" # Close LUKS
 			if [[ $? -eq 0 ]] ; then
 				echo ""${dir_name}" unmounted.. Done."
-		echo "3 $PWD"
-				cd -
-				echo
-		echo "4 $PWD"
-		echo
-
 			fi
 		fi
 	else
