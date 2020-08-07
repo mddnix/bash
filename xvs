@@ -127,6 +127,45 @@ _mount_dir() {
 }
 
 ###################################################################################################
+# Lists tags for metadata.
+# E: openssl aes-256-cbc -md sha256 -salt -pbkdf2 -iter 1024 -a -in clear1.txt -out encrypt.enc
+# D: openssl aes-256-cbc -md sha256 -salt -pbkdf2 -iter 1024 -a -d -in encrypt.enc -out clear2.txt
+###################################################################################################
+_list_tags() {
+Tags() {
+cat <<EOF
+U2FsdGVkX18oEeaG3t2foUbNkGI4SmiE1mpA79WnUvBp2ayWTkM8xX0EK8kSm0sn
+DDEYaZmOBV5crSMnEq6ckOB3hNKtFlOFl3C+D0VeSQ7E5evywvRSzQhVXSd5BtSo
+o5LtKLaah/TtrY/2kBiZpe9W0dFsRJ+wI70x4xR9cAfdBBI6rWpPraaqmPQWIYlv
+BVBuWbxCwHgivIpUii+p9Xw3kZNHcKOpFMe9c6ldGTVuAegDAAJoPdh4lRawKZjp
+wyQQOiyhdlVhf+EFUNDXTAPYkl4c5VApgP1PumksH5VZ8XO0qyMnub3kWceprs5L
+mz+nwZxpemURUbJeCWPl9H4XRpn3TFKOwhv2xFDjGQprYgEphjGtO90TWzoDGcgF
+i4uV7PJjHRQLO7waa0vIpAOxTSx16MiBqgtxIGbUjZjRT4M63SQ0nIDAIvMn6eLO
+mR4JPHwX6ImbSvVNstSS80vxWZ5/paXjHGkQKvuo8rQjTyukHDRSUDYdGXBJQO6Y
+6QYJsv4Itu1roEEhr1N17tS5i919ZJAxfFVtac3eOKnmDCvlpwc1EySmT7cqwKKX
+HIeyjZTvgkxOlMAMabyCLEJWTGORudbmZV3Bkdh6Slg/NYBnI5wBU8EBsZwh1i3J
+nrXtCLZmqvSa5TDw+4zQK9mJIeNZ2fbrome5tL17Fi1a4RU0iE8zv74/Ir7ihpg3
+s1GtxduQCGG7hdSS9gEXOqb2+G2v+zKyFWN5QGhjkNHepx7woFZmbwkUmRegKTM6
+YstwW9Yk2OTNcj5VY9nAqTpqXAwGrKdY/vgwWoNygVpX51C/00Xngbwx8YDelxgR
+xhNKhyo+bfp4TUG7f16ErBOngDCXlFP3XyafHg8w3Z4=
+EOF
+}
+
+	# Store decrypted tags in valriable. Needs password.
+	local var_tags=$(Tags | openssl aes-256-cbc -md sha256 -salt -pbkdf2 -iter 1024 -a -d 2>/dev/null)
+	if [[ "${var_tags}" =~ Birthday ]] ; then
+		echo
+		echo -e ">>> Available Tags <<<"
+		echo "${var_tags}" | column
+		echo
+	else
+	    echo "Sorry! Wrong password."
+		exit 1
+	fi
+}
+
+
+###################################################################################################
 # Unmounts the LUKS partition from a directory.
 # Globals/Constants:
 #   XDEV, XDIR, XMAP, XUSR, NDEV, NDIR, NMAP, NUSR
@@ -185,13 +224,15 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":hm:u:" opt ; do
+while getopts ":hm:tu:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
-		h) _show_help ;;
-		m) _mount_dir "$OPTARG" ;;
-		u) _umount_dir "$OPTARG" ;;
+		h) _show_help ; exit 0 ;;
+		m) _mount_dir "$OPTARG" ; exit 0 ;;
+		t) _list_tags ; exit 0 ;;
+		u) _umount_dir "$OPTARG" ; exit 0 ;;
 		:) echo "Error: -$OPTARG requires an argument" ; exit 1 ;;
 		?) echo "Error: unknown option -$OPTARG" ; exit 1 ;;
 	esac
 done
+shift $(( OPTIND - 1 ))
