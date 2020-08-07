@@ -5,7 +5,7 @@
 # Author      : Madhusudhan D Desai
 # Email       : mddnix@gmail.com
 
-source mybshfunlib.sh
+source BashLib.sh
 
 # Bash shell options
 # ------------------
