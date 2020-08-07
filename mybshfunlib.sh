@@ -88,3 +88,47 @@ _is_cmd() {
 		exit 1
 	fi
 }
+
+###################################################################################################
+# Draw a Title Header in center of the screen.
+# Arguments:
+#   $1: Title Header.
+#   $2: (Optional) Symbol for both left and right sides.
+#   $3: (Optional) Symbol for right side.
+# Return:
+#   echo title header
+###################################################################################################
+_title_header() {
+	# if only arg $1 is given, fill left and right lines with empty space.                              
+	if [[ $# -eq 1 ]] ; then                                                                            
+	    str_title=" $1 "                                                                                
+	    str_lefty=" "                                                                                   
+	    str_right=" "                                                                                   
+	                                                                                                    
+	# if args $1 and $2 are given, fill left and right lines with $2 symbol.                            
+	elif [[ $# -eq 2 ]] ; then                                                                          
+	    str_title=" $1 "                                                                                
+	    str_lefty="$2"                                                                                  
+	    str_right="$str_lefty"                                                                          
+	                                                                                                    
+	# if all args $1,$2 and $3 are given, fill left line with $2 and right line with $3 symbol.            
+	elif [[ $# -eq 3 ]] ; then                                                                          
+	    str_title=" $1 "                                                                                
+	    str_lefty="$2"                                                                                  
+	    str_right="$3"                                                                                  
+	else                                                                                                
+	    echo "Error: Number of parameters incorrect."                                                   
+	    exit 1                                                                                          
+	fi                                                                                                  
+	                                                                                                    
+	len_screen=$(tput cols) # Length of screen width.                                                      
+	len_title=${#str_title} # Length of Title.                                                          
+	len_lefty=$(( (len_screen - len_title) / 2 )) # Length of left part.                                
+	len_right=$(( len_screen - (len_title + len_lefty) )) # Length of right part.                       
+	                                                                                                    
+	var_left=$(printf "%${len_lefty}s"|tr " " "${str_lefty}") # Repeat symbols at left.                    
+	var_cent=$(printf "%s" "${str_title}") # Title at middle.                                              
+	var_right=$(printf "%${len_right}s\n"|tr " " "${str_right}") # Repeat symbols at right.                
+	                                                                                                       
+	echo "${var_left}${var_cent}${var_right}" # Print total header line                              
+}
