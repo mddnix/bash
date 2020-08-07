@@ -155,11 +155,11 @@ EOF
 	local var_tags=$(Tags | openssl aes-256-cbc -md sha256 -salt -pbkdf2 -iter 1024 -a -d 2>/dev/null)
 	if [[ "${var_tags}" =~ Birthday ]] ; then
 		echo
-		echo -e ">>> Available Tags <<<"
+		_title_header "$(_to_upper 'Available Tags')" '>' '<'
 		echo "${var_tags}" | column
 		echo
 	else
-	    echo "Sorry! Wrong password."
+	    echo "Sorry! Wrong password. Exiting..."
 		exit 1
 	fi
 }
