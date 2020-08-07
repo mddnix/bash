@@ -25,6 +25,10 @@ readonly NMAP="NDDM"
 readonly XUSR="neon"
 readonly NUSR="neon"
 
+declare -a file_info=()
+mnt_dir=
+unt_dir=
+
 # Check if necessary commands are installed
 # -----------------------------------------
 _is_cmd "cryptsetup"
@@ -53,14 +57,27 @@ trap '_trap_cleanup' SIGHUP SIGINT SIGQUIT SIGQUIT SIGTERM
 _show_help() {
 cat <<HELP
 Usage: 
- ${SCRIPT_NAME} [option]... <argument>
+ ${SCRIPT_NAME} [OPTIONS]...
 
 Options:
- -h        Show this help.
- -m <dir>  Mount LUKS partition.
-           x -> xvd
-           n -> nvd
+ -h       Show this help.
+ -m [xn]  Mount LUKS partition.
+ -t       Display metadata tags.
+ -u [xn]  Un mount LUKS partition.
 HELP
+}
+
+###################################################################################################
+# Shows short info of video files.
+# Arguments:
+#   $1: Array of video filenames
+###################################################################################################
+_show_info() {
+	for i ; do
+		echo "${i}:"
+		ffprobe "${i}" 2>&1 | egrep "Duration|Stream"
+		echo
+	done
 }
 
 ###################################################################################################
@@ -224,15 +241,24 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":hm:tu:" opt ; do
+while getopts ":hi:m:tu:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
-		h) _show_help ; exit 0 ;;
-		m) _mount_dir "$OPTARG" ; exit 0 ;;
-		t) _list_tags ; exit 0 ;;
-		u) _umount_dir "$OPTARG" ; exit 0 ;;
+		h) _show_help ;;
+		i) file_info+=("$OPTARG") ;;
+		m) mnt_dir="$OPTARG" ;;
+		t) _list_tags ;;
+		u) unt_dir="$OPTARG" ;;
 		:) echo "Error: -$OPTARG requires an argument" ; exit 1 ;;
 		?) echo "Error: unknown option -$OPTARG" ; exit 1 ;;
 	esac
 done
 shift $(( OPTIND - 1 ))
+
+if [[ ! -z "${file_info[@]}" ]] ; then
+	_show_info "${file_info[@]}" 
+elif [[ ! -z "$mnt_dir" ]] ; then
+	_mount_dir "${mnt_dir}"
+elif [[ ! -z "$unt_dir" ]] ; then
+	_umount_dir "${unt_dir}"
+fi
