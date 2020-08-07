@@ -25,9 +25,10 @@ readonly NMAP="NDDM"
 readonly XUSR="neon"
 readonly NUSR="neon"
 
-declare -a file_info=()
-mnt_dir=
-unt_dir=
+declare -a show_info=()
+mount_dir=
+umount_dir=
+slow_video=
 
 # Check if necessary commands are installed
 # -----------------------------------------
@@ -144,6 +145,27 @@ _mount_dir() {
 }
 
 ###################################################################################################
+# Slows down video file.
+# Arguments:
+#   $1: Input video file.
+# Return:
+#   Slowmotion video file
+###################################################################################################
+_slow_video() {
+	local video="$1"
+	local get_info=$(mediainfo --Output="Video;%Duration%" "${video}")
+	local video_in_seconds=$(echo "scale=3;${get_info} / 1000" | bc -l)
+	_draw_line "#" 19
+	echo "   X    DURATION"
+	_draw_line "#" 19
+	for i in {1..30} ; do
+		local seconds=$(echo "$i*$video_in_seconds" | bc -l)
+		local clock=$(date -d@$seconds -u +%M:%S.%3N)
+		printf "%4dx%12s\n" "$i" "$clock"
+	done
+}
+
+###################################################################################################
 # Lists tags for metadata.
 # E: openssl aes-256-cbc -md sha256 -salt -pbkdf2 -iter 1024 -a -in clear1.txt -out encrypt.enc
 # D: openssl aes-256-cbc -md sha256 -salt -pbkdf2 -iter 1024 -a -d -in encrypt.enc -out clear2.txt
@@ -241,24 +263,30 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":hi:m:tu:" opt ; do
+while getopts ":hi:m:s:tu:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
 		h) _show_help ;;
-		i) file_info+=("$OPTARG") ;;
-		m) mnt_dir="$OPTARG" ;;
+		i) show_info+=("$OPTARG") ;;
+		m) mount_dir="$OPTARG" ;;
+		s) slow_video="$OPTARG" ;;
 		t) _list_tags ;;
-		u) unt_dir="$OPTARG" ;;
+		u) umount_dir="$OPTARG" ;;
 		:) echo "Error: -$OPTARG requires an argument" ; exit 1 ;;
 		?) echo "Error: unknown option -$OPTARG" ; exit 1 ;;
 	esac
 done
 shift $(( OPTIND - 1 ))
 
-if [[ ! -z "${file_info[@]}" ]] ; then
-	_show_info "${file_info[@]}" 
-elif [[ ! -z "$mnt_dir" ]] ; then
-	_mount_dir "${mnt_dir}"
-elif [[ ! -z "$unt_dir" ]] ; then
-	_umount_dir "${unt_dir}"
+if [[ ! -z "${show_info[@]}" ]] ; then
+	_show_info "${show_info[@]}" 
+
+elif [[ ! -z "$mount_dir" ]] ; then
+	_mount_dir "${mount_dir}"
+
+elif [[ ! -z "$slow_video" ]] ; then
+	_slow_video "${slow_video}"
+
+elif [[ ! -z "$umount_dir" ]] ; then
+	_umount_dir "${umount_dir}"
 fi
