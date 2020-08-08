@@ -44,7 +44,7 @@ _is_cmd "ffprobe"
 #   CURRENT_DIR
 ###################################################################################################
 _trap_cleanup() {
-	echo "Oops! $(basename $(0)) ($$) has terminated."
+	echo "Oops! $(basename $0) ($$) has terminated."
 	echo "Cleaning temporary files..."
 	find "${CURRENT_DIR}" -type f -name "tmp_xvs_*.mp4" -print -delete
 	echo "Done"
@@ -152,17 +152,39 @@ _mount_dir() {
 #   Slowmotion video file
 ###################################################################################################
 _slow_video() {
-	local video="$1"
-	local get_info=$(mediainfo --Output="Video;%Duration%" "${video}")
-	local video_in_seconds=$(echo "scale=3;${get_info} / 1000" | bc -l)
+
+	# Gather information about video
+	local get_info=( $(mediainfo --Output="Video;%Duration% %FrameRate%" "$1") )
+	local get_sec=${get_info[0]}
+	local get_fps=${get_info[1]}
+
+	# Convert milliseconds to seconds
+	local vid_sec=$(echo "scale=3;${get_sec} / 1000" | bc -l)
+
+	ffprobe "$1" 2>&1 | egrep "Duration|Stream"
+
+	# Print Header
 	_draw_line "#" 19
 	echo "   X    DURATION"
 	_draw_line "#" 19
+
+	# List 1 to 30 times of projected seconds of slow motion video
 	for i in {1..30} ; do
-		local seconds=$(echo "$i*$video_in_seconds" | bc -l)
-		local clock=$(date -d@$seconds -u +%M:%S.%3N)
+		local seconds=$(echo "$i*$vid_sec" | bc -l) # Total seconds = iteration*seconds
+		local clock=$(date -d@$seconds -u +%M:%S.%3N) # Convert seconds to 00:00.000 format
 		printf "%4dx%12s\n" "$i" "$clock"
 	done
+
+	# Print Tail
+	_draw_line "-" 19
+
+	# Ask Times X
+	read -p "Times X: " timesX
+	local total_fps=$(echo "scale=3;$timesX*$get_fps" | bc -l)
+	echo $timesX
+	echo $get_fps
+	echo $total_fps
+
 }
 
 ###################################################################################################
