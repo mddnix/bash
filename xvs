@@ -186,12 +186,34 @@ _slow_video() {
 	echo "  ------------"
 
 	# Ask Times X
-#	read -p "Times X: " timesX
-#	local fps_total_dec=$(echo "scale=3;$timesX*$fps_get" | bc -l)
-#	echo $timesX
-#	echo $fps_get
-#	echo $fps_total_dec
+	read -p "  n? " timesN
 
+	local fps_total=$(echo "scale=2;$timesN*$fps_raw" | bc -l) # Total no of FPS.
+	local output="S-$1-$(date +%I%M%S)-$timesN.avi" # Output raw avi filename.
+
+	echo
+cat <<-EOF
+  ffmpeg -v error -hide_banner -stats \\
+    -i "$1" \\
+    -f lavfi -i anullsrc -shortest \\
+    -c:v rawvideo -vtag YV12 -pix_fmt yuv420p \\
+    -vf "shuffleplanes=0:2:1,minterpolate='fps=${fps_total}',setpts='${timesN}*PTS',fps='fps=${fps_raw}'" \\
+    -c:a pcm_s16le -ar 44100 -ac 2 \\
+    -map 0:v -map 1:a \\
+    -sn -map_chapters -1 \\
+    -f avi ${output}
+EOF
+	echo
+
+	ffmpeg -v error -hide_banner -stats \
+		-i "$1" \
+		-f lavfi -i anullsrc -shortest \
+		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p \
+		-vf "shuffleplanes=0:2:1,minterpolate='fps=${fps_total}',setpts='${timesN}*PTS',fps='fps=${fps_raw}'" \
+		-c:a pcm_s16le -ar 44100 -ac 2 \
+		-map 0:v -map 1:a \
+		-sn -map_chapters -1 \
+		-f avi "${output}"
 }
 
 ###################################################################################################
