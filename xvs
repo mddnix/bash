@@ -153,37 +153,37 @@ _mount_dir() {
 ###################################################################################################
 _slow_video() {
 
-	# Get video time in 00:00:00.00, format from video.
-	time_get=$(ffprobe "$1" 2>&1 \
-		| awk '/Duration:/ {print $2}')
+	# Get video information from ffprobe
+	vid_info=$(ffprobe "$1" 2>&1 | egrep 'Duration:|Stream.*Video:')
 
-	# Trim , at the end.
-	time_trm=${time_get%,}
+	# Extract FPS of video
+	fps_raw=$(echo "$vid_info" | awk '{for (i=1;i<=NF;i++) if($i ~/fps,/) print $(i-1)}')
 
-	# Convert 00:00:00.00 to seconds
-	time_sec=$(echo "${time_trm}" \
-		| awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
+	# Extract duration which is in '00:00:00.00,' format.
+	time_raw=$(echo "$vid_info" | awk '/Duration:/ {print $2}')
 	
-	# Get FPS from video
-	fps_get=$(ffprobe "$1" 2>&1 \
-		| awk '{for (i=1;i<=NF;i++) if($i ~/fps,/) print $(i-1)}')
-	
-	#echo "$time_get $time_trm $time_sec $fps_get"
+	# Trim commna (,) at the end.
+	time_trm=${time_raw%,*}
 
-	ffprobe "$1" 2>&1 | egrep "Duration|Stream"
+	# Convert 00:00:00.00 fomat to seconds.
+	time_sec=$(echo "${time_trm}" | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
+
+	# Display short video info
+	printf "\n%s\n\n" "$vid_info"
+
 	# Print Header
-	_draw_line "#" 19
-	echo "   X   DURATION"
-	_draw_line "#" 19
+	printf "%4s%10s\n" "#" "DURATION"
+	echo "  ============"
+
+	# For 1 to 20 seconds show possible duration for slow motion video
 	for i in {1..20} ; do
-		tot_sec=$(echo "scale=2;$i*$time_sec" | bc -l)
-		tot_time=$(date -d@$tot_sec -u +%M:%S.%2N)
-		#echo -e "$i\t $tot_sec\t$tot_time"
-		printf "%4dx%10s\n" "$i" "$tot_time"
+		total_sec=$(echo "scale=2;$i*$time_sec" | bc -l)
+		total_time=$(date -d@$total_sec -u +%M:%S.%2N)
+		printf "%4d%10s\n" "$i" "$total_time"
 	done
 
 	# Print Tail
-	_draw_line "-" 19
+	echo "  ------------"
 
 	# Ask Times X
 #	read -p "Times X: " timesX
