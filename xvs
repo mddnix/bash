@@ -153,37 +153,44 @@ _mount_dir() {
 ###################################################################################################
 _slow_video() {
 
-	# Gather information about video
-	local get_info=( $(mediainfo --Output="Video;%Duration% %FrameRate%" "$1") )
-	local get_sec=${get_info[0]}
-	local get_fps=${get_info[1]}
+	# Get video time in 00:00:00.00, format from video.
+	time_get=$(ffprobe "$1" 2>&1 \
+		| awk '/Duration:/ {print $2}')
 
-	# Convert milliseconds to seconds
-	local vid_sec=$(echo "scale=3;${get_sec} / 1000" | bc -l)
+	# Trim , at the end.
+	time_trm=${time_get%,}
+
+	# Convert 00:00:00.00 to seconds
+	time_sec=$(echo "${time_trm}" \
+		| awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
+	
+	# Get FPS from video
+	fps_get=$(ffprobe "$1" 2>&1 \
+		| awk '{for (i=1;i<=NF;i++) if($i ~/fps,/) print $(i-1)}')
+	
+	#echo "$time_get $time_trm $time_sec $fps_get"
 
 	ffprobe "$1" 2>&1 | egrep "Duration|Stream"
-
 	# Print Header
 	_draw_line "#" 19
-	echo "   X    DURATION"
+	echo "   X   DURATION"
 	_draw_line "#" 19
-
-	# List 1 to 30 times of projected seconds of slow motion video
-	for i in {1..30} ; do
-		local seconds=$(echo "$i*$vid_sec" | bc -l) # Total seconds = iteration*seconds
-		local clock=$(date -d@$seconds -u +%M:%S.%3N) # Convert seconds to 00:00.000 format
-		printf "%4dx%12s\n" "$i" "$clock"
+	for i in {1..20} ; do
+		tot_sec=$(echo "scale=2;$i*$time_sec" | bc -l)
+		tot_time=$(date -d@$tot_sec -u +%M:%S.%2N)
+		#echo -e "$i\t $tot_sec\t$tot_time"
+		printf "%4dx%10s\n" "$i" "$tot_time"
 	done
 
 	# Print Tail
 	_draw_line "-" 19
 
 	# Ask Times X
-	read -p "Times X: " timesX
-	local total_fps=$(echo "scale=3;$timesX*$get_fps" | bc -l)
-	echo $timesX
-	echo $get_fps
-	echo $total_fps
+#	read -p "Times X: " timesX
+#	local fps_total_dec=$(echo "scale=3;$timesX*$fps_get" | bc -l)
+#	echo $timesX
+#	echo $fps_get
+#	echo $fps_total_dec
 
 }
 
