@@ -74,15 +74,15 @@ HELP
 }
 
 ###################################################################################################
-# Slows down video file.
+# Concatenate one or several videos.
 # Arguments:
-#   $1: Input video file.
+#   $1...: Array of input video file.
 # Return:
-#   Slowmotion video file
+#   Concatenated video file.
 ###################################################################################################
 _cnct_video() {
 	local files=
-	local output="_C$(date +%I%M%S).avi" # Output raw avi filename.
+	local output="_C$(date +%I%M%S).avi" # Concatenated avi output filename.
 	for i ; do
 		files="$files|$i"
 	done
@@ -91,16 +91,42 @@ _cnct_video() {
 }
 
 ###################################################################################################
-# Shows short info of video files.
+# Shows short info of video file(s).
 # Arguments:
-#   $1: Array of video filenames
+#   $1...: Array of video filenames
+# Return:
+#   Short info of video file(s).
 ###################################################################################################
 _info_video() {
 	for i ; do
-		echo "${i}:"
-		ffprobe "${i}" 2>&1 | egrep "Duration|Stream"
+		echo "${i}:" # Print video file name
+		ffprobe "${i}" 2>&1 | egrep "Duration|Stream" # ffprobe short info
 		echo
 	done
+}
+
+###################################################################################################
+# Concatenate one or several videos.
+# Arguments:
+#   $1...: Array of input video file.
+# Return:
+#   Concatenated video file.
+###################################################################################################
+_join_video() {
+	local files=
+	local sec=0
+	local secs=0
+	local output="_J$(date +%I%M%S).avi" # Joined avi output filename.
+
+	for i ; do
+		sec=$(echo "scale=2;$(mediainfo --fullscan --Inform="Video;%Duration%" "$i")/1000"|bc -l)
+		secs=$(echo "scale=2;$secs+$sec"|bc -l) # Total duration of all video files.
+		files="$files|$i"
+	done
+
+	files=${files#|*} # Trim beginning | character.
+	echo $files
+	echo $secs
 }
 
 ###################################################################################################
@@ -336,12 +362,13 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":c:hi:m:s:tu:" opt ; do
+while getopts ":c:hi:j:m:s:tu:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
 		h) _help_show ;;
 		c) cnct_video+=("$OPTARG") ;;
 		i) info_video+=("$OPTARG") ;;
+		j) join_video+=("$OPTARG") ;;
 		m) mount_dir="$OPTARG" ;;
 		s) slow_video="$OPTARG" ;;
 		t) _tags_list ;;
@@ -357,6 +384,9 @@ if [[ ! -z "${cnct_video[@]}" ]] ; then
 
 elif [[ ! -z "${info_video[@]}" ]] ; then
 	_info_video "${info_video[@]}" 
+
+elif [[ ! -z "${join_video[@]}" ]] ; then
+	_join_video "${join_video[@]}" 
 
 elif [[ ! -z "$mount_dir" ]] ; then
 	_mount_dir "${mount_dir}"
