@@ -27,7 +27,7 @@ readonly NUSR="neon"
 
 # Global variables
 # ----------------
-declare -a show_info=()
+declare -a info_video=()
 mount_dir=
 umount_dir=
 slow_video=
@@ -57,17 +57,37 @@ trap '_trap_cleanup' SIGHUP SIGINT SIGQUIT SIGQUIT SIGTERM
 ###################################################################################################
 # Show help.
 ###################################################################################################
-_show_help() {
+_help_show() {
 cat <<HELP
 Usage: 
  ${SCRIPT_NAME} [OPTIONS]...
 
 Options:
- -h       Show this help.
- -m [xn]  Mount LUKS partition.
- -t       Display metadata tags.
- -u [xn]  Un mount LUKS partition.
+ -h            Help.   Show this help.
+ -c [file]...  Concat. Concatenate several videos.
+ -i [file]...  Info.   Show info of video(s).
+ -m [xn]       Mount.  Mounts LUKS partition into directory.
+ -s [file]     Slow.   Create slowmotion video.
+ -t            Tags.   Display metadata tags.
+ -u [xn]       Umount. Unmount LUKS partition from directory.
 HELP
+}
+
+###################################################################################################
+# Slows down video file.
+# Arguments:
+#   $1: Input video file.
+# Return:
+#   Slowmotion video file
+###################################################################################################
+_cnct_video() {
+	local files=
+	local output="_C$(date +%I%M%S).avi" # Output raw avi filename.
+	for i ; do
+		files="$files|$i"
+	done
+	files=${files#|*}
+	ffmpeg -v info -hide_banner -stats -i concat:"${files}" -c copy "${output}"
 }
 
 ###################################################################################################
@@ -75,7 +95,7 @@ HELP
 # Arguments:
 #   $1: Array of video filenames
 ###################################################################################################
-_show_info() {
+_info_video() {
 	for i ; do
 		echo "${i}:"
 		ffprobe "${i}" 2>&1 | egrep "Duration|Stream"
@@ -174,8 +194,7 @@ _slow_video() {
 	#echo "$input | $get_sec | $get_fps | $sec | $fps | $calc_total_frames | $orig_frame | $frm"
 
 	# Print header
-	echo
-	echo "Source: ${input}, ${sec} seconds, ${fps} fps, ${orig_frame} frames."
+	echo "Source: ${input}, ${sec} secs, ${fps} fps, ${orig_frame} frames."
 	_draw_line '=' 32
 	printf "%4s%8s%7s%9s\n" "#" "FRAME" "SECS" "TIME"
 	_draw_line '=' 32
@@ -224,7 +243,7 @@ _slow_video() {
 # E: openssl aes-256-cbc -md sha256 -salt -pbkdf2 -iter 1024 -a -in clear1.txt -out encrypt.enc
 # D: openssl aes-256-cbc -md sha256 -salt -pbkdf2 -iter 1024 -a -d -in encrypt.enc -out clear2.txt
 ###################################################################################################
-_list_tags() {
+_tags_list() {
 Tags() {
 cat <<EOF
 U2FsdGVkX18oEeaG3t2foUbNkGI4SmiE1mpA79WnUvBp2ayWTkM8xX0EK8kSm0sn
@@ -317,14 +336,15 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":hi:m:s:tu:" opt ; do
+while getopts ":c:hi:m:s:tu:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
-		h) _show_help ;;
-		i) show_info+=("$OPTARG") ;;
+		h) _help_show ;;
+		c) cnct_video+=("$OPTARG") ;;
+		i) info_video+=("$OPTARG") ;;
 		m) mount_dir="$OPTARG" ;;
 		s) slow_video="$OPTARG" ;;
-		t) _list_tags ;;
+		t) _tags_list ;;
 		u) umount_dir="$OPTARG" ;;
 		:) echo "Error: -$OPTARG requires an argument" ; exit 1 ;;
 		?) echo "Error: unknown option -$OPTARG" ; exit 1 ;;
@@ -332,8 +352,11 @@ while getopts ":hi:m:s:tu:" opt ; do
 done
 shift $(( OPTIND - 1 ))
 
-if [[ ! -z "${show_info[@]}" ]] ; then
-	_show_info "${show_info[@]}" 
+if [[ ! -z "${cnct_video[@]}" ]] ; then
+	_cnct_video "${cnct_video[@]}"
+
+elif [[ ! -z "${info_video[@]}" ]] ; then
+	_info_video "${info_video[@]}" 
 
 elif [[ ! -z "$mount_dir" ]] ; then
 	_mount_dir "${mount_dir}"
