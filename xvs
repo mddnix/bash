@@ -45,7 +45,7 @@ _is_cmd "ffprobe"
 ###################################################################################################
 _trap_cleanup() {
 	echo "Oops! $(basename $0) ($$) has terminated."
-	echo "Cleaning temporary files..."
+	echo "Cleaning temporary files (if any)..."
 	find "${CURRENT_DIR}" -type f -name "tmp_xvs_*.mp4" -print -delete
 	echo "Done"
 	exit 2
@@ -152,65 +152,65 @@ _mount_dir() {
 #   Slowmotion video file
 ###################################################################################################
 _slow_video() {
+	local input="$1" # vid.mkv
+	# Type 1
+	#local get_info=$(mediainfo --fullscan --Inform="Video;%Duration% %FrameRate%" "$input") # 3504.000000 23.976
+	#local sec=$(echo "scale=3;${get_info% *}/1000"|bc -l) # 3.504
+	#local fps=${get_info#* } # 23.976
 
-	# Get video information from ffprobe
-	vid_info=$(ffprobe "$1" 2>&1 | egrep 'Duration:|Stream.*Video:')
+	# Type 2
+	local get_sec=$(mediainfo --fullscan --Inform="Video;%Duration%" "$input") # 3504.000000
+	local get_fps=$(ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate \
+		-of default=noprint_wrappers=1:nokey=1 "${input}") # 24000/1001
+	local sec=$(echo "scale=3;${get_sec}/1000"|bc -l) # 3.504
+	local fps=$(echo "scale=3;$get_fps"|bc -l) # 23.976
 
-	# Extract FPS of video
-	fps_raw=$(echo "$vid_info" | awk '{for (i=1;i<=NF;i++) if($i ~/fps,/) print $(i-1)}')
+	local calc_total_frames=$(echo "$sec*$fps"|bc -l) # 84.011904 
+	local orig_frame=${calc_total_frames%.*} # 84
+	local frm=$(( orig_frame - 2 ))
+	#echo "$input | $get_info | $sec | $fps | $calc_total_frames | $orig_frame | $frm"
 
-	# Extract duration which is in '00:00:00.00,' format.
-	time_raw=$(echo "$vid_info" | awk '/Duration:/ {print $2}')
-	
-	# Trim commna (,) at the end.
-	time_trm=${time_raw%,*}
+	# Print header
+	echo
+	echo "Source: ${input}, ${sec} seconds, ${fps} fps, ${orig_frame} frames."
+	_draw_line '=' 32
+	printf "%4s%8s%7s%9s\n" "#" "FRAME" "SECS" "TIME"
+	_draw_line '=' 32
 
-	# Convert 00:00:00.00 fomat to seconds.
-	time_sec=$(echo "${time_trm}" | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }')
-
-	# Display short video info
-	printf "\n%s\n\n" "$vid_info"
-
-	# Print Header
-	printf "%4s%10s\n" "#" "DURATION"
-	echo "  ============"
-
-	# For 1 to 20 seconds show possible duration for slow motion video
+	# Give prediction for 20 seconds
 	for i in {1..20} ; do
-		total_sec=$(echo "scale=2;$i*$time_sec" | bc -l)
-		total_time=$(date -d@$total_sec -u +%M:%S.%2N)
-		printf "%4d%10s\n" "$i" "$total_time"
+		local tot_frm=$(( i*frm )) # First iteration: (1x82)=82
+		local tot_sec=$(echo "scale=2;$tot_frm/$fps"|bc -l) # First iteration: (82/23.976)=3.42
+		local tot_clk=$(date -d@$tot_sec -u +%M:%S.%2N)
+		printf "%4d%7d%8.2f%11s\n" "$i" "$tot_frm" "$tot_sec" "$tot_clk"
 	done
 
-	# Print Tail
-	echo "  ------------"
-
-	# Ask Times X
+	# Print tail and ask for slowmotion times.
+	_draw_line '-' 32
 	read -p "  n? " timesN
+	if [[ "${timesN}" = "q" ]] ; then
+		exit 0
+	fi
 
-	local fps_total=$(echo "scale=2;$timesN*$fps_raw" | bc -l) # Total no of FPS.
-	local output="S-$1-$(date +%I%M%S)-$timesN.avi" # Output raw avi filename.
+	# Final variable calulation for output.
+	local op_total_frames=$(( timesN * frm )) # Output video total frames.
+	local op_mid_mfps=$(echo "$timesN*$fps"|bc -l) # Required minterpolate fps (float).
+	local op_total_mfps=$(printf "%.f" $op_mid_mfps) # Output minterpolate fps (round).
+	local op_total_sec=$(echo "scale=2;$op_total_frames/$fps"|bc -l) # Output total seconds.
+	local op_total_clk=$(date -d@$op_total_sec -u +%M:%S.%2N) # output total time in clock.
+	local output="_S${input}_$(date +%I%M%S)_${timesN}_${op_total_sec}.avi" # Output raw avi filename.
 
+	# Print output file details.
 	echo
-cat <<-EOF
-  ffmpeg -v error -hide_banner -stats \\
-    -i "$1" \\
-    -f lavfi -i anullsrc -shortest \\
-    -c:v rawvideo -vtag YV12 -pix_fmt yuv420p \\
-    -vf "shuffleplanes=0:2:1,minterpolate='fps=${fps_total}',setpts='${timesN}*PTS',fps='fps=${fps_raw}'" \\
-    -c:a pcm_s16le -ar 44100 -ac 2 \\
-    -map 0:v -map 1:a \\
-    -sn -map_chapters -1 \\
-    -f avi ${output}
-EOF
-	echo
+	echo "Target: ${output}, ${op_total_mfps} mfps, ${op_total_frames} frames, ${op_total_clk} duration. "
 
+	# Start encoding slowmotion video
 	ffmpeg -v error -hide_banner -stats \
-		-i "$1" \
+		-i "${input}" \
 		-f lavfi -i anullsrc -shortest \
 		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p \
-		-vf "shuffleplanes=0:2:1,minterpolate='fps=${fps_total}',setpts='${timesN}*PTS',fps='fps=${fps_raw}'" \
-		-c:a pcm_s16le -ar 44100 -ac 2 \
+		-vf "shuffleplanes=0:2:1,minterpolate='fps=${op_total_mfps}',setpts='${timesN}*PTS',fps='fps=${fps}'" \
+		-c:a pcm_s16le -ar 48000 -ac 2 \
 		-map 0:v -map 1:a \
 		-sn -map_chapters -1 \
 		-f avi "${output}"
