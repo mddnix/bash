@@ -25,6 +25,8 @@ readonly NMAP="NDDM"
 readonly XUSR="neon"
 readonly NUSR="neon"
 
+# Global variables
+# ----------------
 declare -a show_info=()
 mount_dir=
 umount_dir=
@@ -157,6 +159,7 @@ _slow_video() {
 	#local get_info=$(mediainfo --fullscan --Inform="Video;%Duration% %FrameRate%" "$input") # 3504.000000 23.976
 	#local sec=$(echo "scale=3;${get_info% *}/1000"|bc -l) # 3.504
 	#local fps=${get_info#* } # 23.976
+	#echo "$input | $get_info | $sec | $fps | $calc_total_frames | $orig_frame | $frm"
 
 	# Type 2
 	local get_sec=$(mediainfo --fullscan --Inform="Video;%Duration%" "$input") # 3504.000000
@@ -168,7 +171,7 @@ _slow_video() {
 	local calc_total_frames=$(echo "$sec*$fps"|bc -l) # 84.011904 
 	local orig_frame=${calc_total_frames%.*} # 84
 	local frm=$(( orig_frame - 2 ))
-	#echo "$input | $get_info | $sec | $fps | $calc_total_frames | $orig_frame | $frm"
+	#echo "$input | $get_sec | $get_fps | $sec | $fps | $calc_total_frames | $orig_frame | $frm"
 
 	# Print header
 	echo
