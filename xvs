@@ -28,9 +28,11 @@ readonly NUSR="neon"
 # Global variables
 # ----------------
 declare -a info_video=()
+#declare -a input_video=()
 mount_dir=
 umount_dir=
 slow_video=
+audio_file=
 
 # Check if necessary commands are installed
 # -----------------------------------------
@@ -113,20 +115,36 @@ _info_video() {
 #   Concatenated video file.
 ###################################################################################################
 _join_video() {
-	local files=
+	local in_audio="$1" # Audio filename.
+	shift
+	local in_video=("$@") # Array of video filenames.
+
+	local files=""
 	local sec=0
 	local secs=0
 	local output="_J$(date +%I%M%S).avi" # Joined avi output filename.
 
-	for i ; do
-		sec=$(echo "scale=2;$(mediainfo --fullscan --Inform="Video;%Duration%" "$i")/1000"|bc -l)
+	# Assign background audio. Audio file if provided or a null audio.
+	if [[ -n "${in_audio}" ]] ; then
+		bg_audio="-i ${in_audio} -shortest"
+	else
+		bg_audio="-f lavfi -i anullsrc -shortest"
+	fi
+
+
+
+	# Find duration of all videos + Join video filenames with '|' inbetween them.
+	for i in "${in_video[@]}" ; do
+		sec=$(echo "scale=2;$(mediainfo --fullscan \
+			--Inform="Video;%Duration%" "$i")/1000"|bc -l) # Grab duration of each videos.
 		secs=$(echo "scale=2;$secs+$sec"|bc -l) # Total duration of all video files.
-		files="$files|$i"
+		files="$files|$i" # Join video filename with '|' inbetween.
 	done
 
 	files=${files#|*} # Trim beginning | character.
-	echo $files
-	echo $secs
+	echo "$files ;; $secs ;; $bg_audio"
+
+
 }
 
 ###################################################################################################
@@ -262,6 +280,7 @@ _slow_video() {
 		-map 0:v -map 1:a \
 		-sn -map_chapters -1 \
 		-f avi "${output}"
+	sync
 }
 
 ###################################################################################################
@@ -362,10 +381,11 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":c:hi:j:m:s:tu:" opt ; do
+while getopts ":a:c:hi:j:m:s:tu:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
 		h) _help_show ;;
+		a) audio_file="$OPTARG" ;;
 		c) cnct_video+=("$OPTARG") ;;
 		i) info_video+=("$OPTARG") ;;
 		j) join_video+=("$OPTARG") ;;
@@ -379,21 +399,32 @@ while getopts ":c:hi:j:m:s:tu:" opt ; do
 done
 shift $(( OPTIND - 1 ))
 
+
+# Concatenate Videos function.
 if [[ ! -z "${cnct_video[@]}" ]] ; then
 	_cnct_video "${cnct_video[@]}"
 
+# Info Videos function.
 elif [[ ! -z "${info_video[@]}" ]] ; then
 	_info_video "${info_video[@]}" 
 
-elif [[ ! -z "${join_video[@]}" ]] ; then
-	_join_video "${join_video[@]}" 
+# Join Videos function with only videos.
+elif [[ ! -z "${join_video[@]}" && -z "${audio_file}" ]] ; then
+	_join_video "" "${join_video[@]}"
 
+# Join Videos function with both videos and audio.
+elif [[ ! -z "${join_video[@]}" && ! -z "${audio_file}" ]] ; then
+	_join_video "${audio_file}" "${join_video[@]}" 
+
+# Mount device into a folder.
 elif [[ ! -z "$mount_dir" ]] ; then
 	_mount_dir "${mount_dir}"
 
+# Slowmotion videos.
 elif [[ ! -z "$slow_video" ]] ; then
 	_slow_video "${slow_video}"
 
+# Unmount device from folder.
 elif [[ ! -z "$umount_dir" ]] ; then
 	_umount_dir "${umount_dir}"
 fi
