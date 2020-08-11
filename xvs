@@ -84,12 +84,45 @@ HELP
 ###################################################################################################
 _cnct_video() {
 	local files=
-	local output="_C$(date +%I%M%S).avi" # Concatenated avi output filename.
+	local output=
+	local ctr=1
+	declare -a get_video_info=()
+	declare -a get_audio_info=()
+
+	# Club video filenames with '|' inbetween them.
 	for i ; do
+		get_video_info=($(mediainfo --fullscreen \
+			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Format% %Duration%" "$i"))
+		
+		get_audio_info=($(mediainfo --fullscreen \
+			--Inform="Audio;%Format% %SamplingRate% %Channel(s)%" "$i"))
+
+		printf "%2d %8s %7s  %-7s %-7s %5s %3s %6.2f  %s\n" \
+			$((ctr ++)) \
+			"${get_video_info[0]}" \
+			"${get_video_info[1]}" \
+			"${get_video_info[2]}" \
+			"${get_audio_info[0]}" \
+			"${get_audio_info[1]}" \
+			"${get_audio_info[2]}" \
+			"$(echo "${get_video_info[3]}"/1000|bc -l)" \
+			"${i}" 
+
 		files="$files|$i"
 	done
-	files=${files#|*}
-	ffmpeg -v info -hide_banner -stats -i concat:"${files}" -c copy "${output}"
+	files=${files#|*} # Remove '|' at beginning.
+	output="_C$(date +%H%M%S).avi" # Concatenated avi output filename.
+
+	# Print output command for reference
+	echo
+	echo "[#" ffmpeg -v error -hide_banner -stats \
+		-i concat:"${files}" \
+		-c copy "${output}" "#]"
+	
+	# Start concatenating.
+	ffmpeg -v error -hide_banner -stats \
+		-i concat:"${files}" \
+		-c copy "${output}"
 }
 
 ###################################################################################################
@@ -127,7 +160,7 @@ _join_video() {
 	local afilter="" # Holds audio filter for fadeout.
 	local vol_loud="1" # Holds volume loud level. 1 = 100%
 	local end_dur= # Holds total seconds - 1.
-	local output="_J$(date +%I%M%S).avi" # Joined avi output filename.
+	local output="_J$(date +%H%M%S).avi" # Joined avi output filename.
 
 
 	# Find duration of all videos + Join video filenames with '|' inbetween them.
@@ -287,7 +320,7 @@ _slow_video() {
 	local op_total_mfps=$(printf "%.f" $op_mid_mfps) # Output minterpolate fps (round).
 	local op_total_sec=$(echo "scale=2;$op_total_frames/$fps"|bc -l) # Output total seconds.
 	local op_total_clk=$(date -d@$op_total_sec -u +%M:%S.%2N) # output total time in clock.
-	local output="_S${input}_$(date +%I%M%S)_${timesN}_${op_total_sec}.avi" # Output raw avi filename.
+	local output="_S${input}_$(date +%H%M%S)_${timesN}_${op_total_sec}.avi" # Output raw avi filename.
 
 	# Print output file details.
 	echo
@@ -414,31 +447,33 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":a:c:hi:j:m:s:tu:" opt ; do
+while getopts ":ha:c:f:i:j:m:s:tu:v:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
 		h) _help_show ;;
 		a) audio_file="$OPTARG" ;;
 		c) cnct_video+=("$OPTARG") ;;
+		f) fade_audio="$OPTARG" ;;
 		i) info_video+=("$OPTARG") ;;
 		j) join_video+=("$OPTARG") ;;
 		m) mount_dir="$OPTARG" ;;
 		s) slow_video="$OPTARG" ;;
 		t) _tags_list ;;
 		u) umount_dir="$OPTARG" ;;
+		v) volume="$OPTARG" ;;
 		:) echo "Error: -$OPTARG requires an argument" ; exit 1 ;;
 		?) echo "Error: unknown option -$OPTARG" ; exit 1 ;;
 	esac
 done
-shift $(( OPTIND - 1 ))
+shift "$((OPTIND-1))"
 
 
 # Concatenate Videos function.
-if [[ ! -z "${cnct_video[@]}" ]] ; then
+if [[ -n "${cnct_video[@]}" && "${#cnct_video[@]}" -gt 1 ]] ; then
 	_cnct_video "${cnct_video[@]}"
 
 # Info Videos function.
-elif [[ ! -z "${info_video[@]}" ]] ; then
+elif [[ -n "${info_video[@]}" ]] ; then
 	_info_video "${info_video[@]}" 
 
 # Join Videos function with only videos.
