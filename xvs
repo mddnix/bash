@@ -28,11 +28,12 @@ readonly NUSR="neon"
 # Global variables
 # ----------------
 declare -a info_video=()
-#declare -a input_video=()
 mount_dir=
 umount_dir=
 slow_video=
 audio_file=
+fade_audio=
+volume=
 
 # Check if necessary commands are installed
 # -----------------------------------------
@@ -86,6 +87,8 @@ _cnct_video() {
 	local files=
 	local output=
 	local ctr=1
+	local sec=0
+	local secs=0
 	declare -a get_video_info=()
 	declare -a get_audio_info=()
 
@@ -97,8 +100,9 @@ _cnct_video() {
 		get_audio_info=($(mediainfo --fullscreen \
 			--Inform="Audio;%Format% %SamplingRate% %Channel(s)%" "$i"))
 
+		# Print video information
 		printf "%2d %8s %7s  %-7s %-7s %5s %3s %6.2f  %s\n" \
-			$((ctr ++)) \
+			$(( ctr++ )) \
 			"${get_video_info[0]}" \
 			"${get_video_info[1]}" \
 			"${get_video_info[2]}" \
@@ -107,9 +111,11 @@ _cnct_video() {
 			"${get_audio_info[2]}" \
 			"$(echo "${get_video_info[3]}"/1000|bc -l)" \
 			"${i}" 
-
+		sec=$(echo "scale=2;(${get_video_info[3]})/1000"|bc -l)
+		secs=$(echo "scale=2;($secs+$sec)/1"|bc -l)
 		files="$files|$i"
 	done
+	echo "TOTAL: ${secs}"
 	files=${files#|*} # Remove '|' at beginning.
 	output="_C$(date +%H%M%S).avi" # Concatenated avi output filename.
 
@@ -141,75 +147,96 @@ _info_video() {
 }
 
 ###################################################################################################
-# Concatenate one or several videos.
+# Join video(s) with audio.
 # Arguments:
-#   $1...: Array of input video file.
+#   $1: Audio file.
+#   $2: Volume level.
+#   $3: Fadeout seconds.
+#   $4...: Video file(s). 
 # Return:
-#   Concatenated video file.
+#   Joined video witj custom audio file.
 ###################################################################################################
 _join_video() {
-	local in_audio="$1" # Audio filename.
-	shift # Move to next argument.
+	local in_audio="$1"   # Audio filename.
+	local in_volume="$2"  # Audio volume.
+	local in_fade="$3"    # Audio fadeout.
+	shift 3               # Move to next 3 argument.
 	local in_video=("$@") # Array of video filenames.
 
-	local files= # Holds concatenated file name(s).
-	local sec=0    # Holds seconds of individual video file.
-	local secs=0   # Holds Total duration in seconds of all files.
+	declare -a get_video_info=()
+	local ctr=1
+	local files=    # Holds concatenated file name(s).
+	local sec=0     # Holds seconds of individual video file.
+	local secs=0    # Holds Total duration in seconds of all files.
 	local bg_audio= # Holds background audio file.
-	local is_fade= # Null for yes and 'n' for no-fade.
-	local afilter="" # Holds audio filter for fadeout.
-	local vol_loud="1" # Holds volume loud level. 1 = 100%
-	local end_dur= # Holds total seconds - 1.
-	local output="_J$(date +%H%M%S).avi" # Joined avi output filename.
+	local afilter=  # Holds audio filter.
+	local end_dur=  # Holds total seconds - 1.
+	local output=   # Joined avi output filename.
+	output="_J$(date +%H%M%S).avi" # Output joined video filename.
 
 
 	# Find duration of all videos + Join video filenames with '|' inbetween them.
 	for i in "${in_video[@]}" ; do
-		sec=$(echo "scale=2;$(mediainfo --fullscan \
-			--Inform="Video;%Duration%" "$i")/1000"|bc -l) # Grab duration of each videos.
-		secs=$(echo "scale=2;$secs+$sec"|bc -l) # Total duration of all video files.
+		get_video_info=($(mediainfo --fullscreen \
+			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Duration%" "$i"))
+
+		sec=$(echo "${get_video_info[2]}/1000"|bc -l) # Duration of each videos.
+		
+		secs=$(echo "scale=2;($secs+$sec)/1"|bc -l) # Total duration of all video files.
 		files="$files|$i" # Join video filename with '|' inbetween.
+
+		# Print video information
+		printf "%2d %8s %7s %6.2f %s\n" \
+			$(( ctr++ )) \
+			"${get_video_info[0]}" \
+			"${get_video_info[1]}" \
+			"${sec}" \
+			"${i}" 
 	done
+	echo "Total: ${secs} seconds"
+	echo
 	files=${files#|*} # Trim beginning | character.
 
 	# Set background audio.
 	if [[ -n "${in_audio}" ]] ; then
 		bg_audio="-i ${in_audio} -shortest" # Audio file selected.
-
-		# Set volume level.
-		echo
-		echo "25%=0.25 50%=0.5 150%=1.5 200%=2.0"
-		read -p "Audio Volume (Press <ENTER> for Default):" vol_loud
-		if [[ -n "${vol_loud}" ]] ; then
-			afilter="-af volume=${vol_loud}"
-		fi
-
-		# Set fade-out audio at the end.
-		echo
-		read -p "Fade at the end? (Press <ENTER> for Yes): " is_fade
-		if [[ ! -n "${is_fade}" || "${is_fade}" =~ [Yy] ]] ; then
-			end_dur=$(echo "scale=2;${secs}-1" | bc -l) # total seconds-1
-			afilter="-af ${afilter},afade=in:st=0:d=1,afade=out:st=${end_dur}:d=1"
-		else
-			afilter="-af afade=in:st=0:d=1,afade=out:st=${end_dur}:d=1"
-		fi
-
-
-
 	else
-		bg_audio="-f lavfi -i anullsrc -shortest" # Null audio selected.
+		bg_audio="-f lavfi -i anullsrc -shortest"
 	fi
-	echo "$files"
-	echo "$secs"
-	echo "-"
-	echo "$in_audio"
-	echo "$bg_audio"
-	echo "$afilter"
-	echo "-"
 
+	# Set volume level
+	if [[ -n "${in_volume}" && -z "${in_fade}" ]] ; then # If only volume is given
+		afilter="-af volume=${in_volume}"
 
+	elif [[ -n "${in_fade}" && -z "${in_volume}" ]] ; then # If only fadeout is given
+		end_dur=$(echo "scale=2;($secs-$in_fade)/1"|bc -l)
+		afilter="-af afade=in:st=0:d=1,afade=out:st=${end_dur}:d=${in_fade}"
 
+	elif [[ -n "${in_volume}" && -n "${in_fade}" ]] ; then # If both volume and fadeout is given
+		end_dur=$(echo "scale=2;($secs-$in_fade)/1"|bc -l)
+		afilter="-af volume=${in_volume},afade=out:st=${end_dur}:d=${in_fade}"
+	else
+		afilter="" # No setting
+	fi
 
+	echo "[#" ffmpeg -v error -hide_banner -stats \
+		-i concat:"${files}" \
+		${bg_audio} \
+		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p -vf shuffleplanes=0:2:1 \
+		-c:a pcm_s16le -ar 48000 -ac 2 \
+		${afilter} \
+		-map 0:v -map 1:a \
+		${output} "#]"
+
+	# Start concatenating.
+	ffmpeg -v error -hide_banner -stats \
+		-i concat:"${files}" \
+		${bg_audio} \
+		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p -vf shuffleplanes=0:2:1 \
+		-c:a pcm_s16le -ar 48000 -ac 2 \
+		${afilter} \
+		-map 0:v -map 1:a \
+		${output}
 }
 
 ###################################################################################################
@@ -219,9 +246,7 @@ _join_video() {
 ###################################################################################################
 _mount_dir() {
 
-	###### Check if $1 has correct values - x or n.
-	## (T) Parameter is 'x' or 'n'. Assign constant values to local variables.
-	## (F) Parameter is other than 'x' or 'n'. Exit script with an error message.
+	# Check if $1 has correct values - x or n.
 	if [[ "$1" = "x" ]] ; then
 		local dev_name="${XDEV}"
 		local dir_name="${XDIR}"
@@ -237,9 +262,7 @@ _mount_dir() {
 		exit 1
 	fi
 
-	###### Check if mount directory already (not) exist.
-	## (T) Create a directory then apply username, groupname and perm 0770 to that directory.
-	## (F) Do nothing.
+	# Check if mount directory already (not) exist.
 	if [[ ! -d "${dir_name}" ]] ; then
 		echo "Directory '${dir_name}' does not exist. Creating it..."
 		sudo install -o "${usr_name}" -g "${usr_name}" -m 0770 -d "${dir_name}" # Create dirctory.
@@ -251,9 +274,7 @@ _mount_dir() {
 		fi
 	fi
 
-	###### Check if LUKS device already mounted into a directory.
-	## (T) Print an error message and do nothing.
-	## (F) Open LUKS device and mount it into a directory.
+	# Check if LUKS device already mounted into a directory.
 	if [[ $(findmnt -M "${dir_name}") ]] ; then
 		echo "${dir_name} already mounted with ${dev_name}. Doing nothing."
 		exit 1
@@ -395,9 +416,7 @@ EOF
 ###################################################################################################
 _umount_dir() {
 
-	###### Check if $1 has correct values - x or n.
-	## (T) Parameter is 'x' or 'n'. Assign constant values to local variables.
-	## (F) Parameter is other than 'x' or 'n'. Exit script with an error message.
+	# Check if $1 has correct values - x or n.
 	if [[ "$1" = "x" ]] ; then
 		local dev_name="${XDEV}"
 		local dir_name="${XDIR}"
@@ -419,9 +438,7 @@ _umount_dir() {
 		exit 1
 	fi
 
-	###### Check if directory is already mounted.
-	## (T) Un-Mount directory.
-	## (F) Print an error message and do nothing.
+	# Check if directory is already mounted.
 	if [[ $(findmnt -M "${dir_name}") ]] ; then
 		echo "Unmounting ${dir_name}..."
 
@@ -471,28 +488,45 @@ shift "$((OPTIND-1))"
 # Concatenate Videos function.
 if [[ -n "${cnct_video[@]}" && "${#cnct_video[@]}" -gt 1 ]] ; then
 	_cnct_video "${cnct_video[@]}"
+fi
 
 # Info Videos function.
-elif [[ -n "${info_video[@]}" ]] ; then
+if [[ -n "${info_video[@]}" ]] ; then
 	_info_video "${info_video[@]}" 
+fi
 
 # Join Videos function with only videos.
-elif [[ ! -z "${join_video[@]}" && -z "${audio_file}" ]] ; then
-	_join_video "" "${join_video[@]}"
+if [[ -n "${join_video[@]}" && -z "${audio_file}" && -z "${volume}" && -z "${fade_audio}" ]] ; then
+	_join_video "" "" "" "${join_video[@]}"
 
-# Join Videos function with both videos and audio.
-elif [[ ! -z "${join_video[@]}" && ! -z "${audio_file}" ]] ; then
-	_join_video "${audio_file}" "${join_video[@]}" 
+# Join Videos function with videos and audio.
+elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -z "${volume}" && -z "${fade_audio}" ]] ; then
+	_join_video "${audio_file}" "" "" "${join_video[@]}" 
+
+# Join Videos function with videos, audio and volume.
+elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -n "${volume}" && -z "${fade_audio}" ]] ; then
+	_join_video "${audio_file}" "${volume}" "" "${join_video[@]}" 
+
+# Join Videos function with videos, audio and fade-out.
+elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -z "${volume}" && -n "${fade_audio}" ]] ; then
+	_join_video "${audio_file}" "" "${fade_audio}" "${join_video[@]}" 
+
+# Join Videos function with videos, audio, volume and fade-out.
+elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -n "${volume}" && -n "${fade_audio}" ]] ; then
+	_join_video "${audio_file}" "${volume}" "${fade_audio}" "${join_video[@]}" 
+fi
 
 # Mount device into a folder.
-elif [[ ! -z "$mount_dir" ]] ; then
+if [[ ! -z "$mount_dir" ]] ; then
 	_mount_dir "${mount_dir}"
+fi
 
 # Slowmotion videos.
-elif [[ ! -z "$slow_video" ]] ; then
+if [[ ! -z "$slow_video" ]] ; then
 	_slow_video "${slow_video}"
+fi
 
 # Unmount device from folder.
-elif [[ ! -z "$umount_dir" ]] ; then
+if [[ ! -z "$umount_dir" ]] ; then
 	_umount_dir "${umount_dir}"
 fi
