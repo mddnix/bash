@@ -34,6 +34,9 @@ slow_video=
 audio_file=
 fade_audio=
 volume=
+raw_video=
+artist_name=
+title_name=
 
 # Check if necessary commands are installed
 # -----------------------------------------
@@ -120,10 +123,11 @@ _cnct_video() {
 	output="_C$(date +%H%M%S).avi" # Concatenated avi output filename.
 
 	# Print output command for reference
-	echo
-	echo "[#" ffmpeg -v error -hide_banner -stats \
+	_draw_line "-"
+	echo ffmpeg -v error -hide_banner -stats \
 		-i concat:"${files}" \
-		-c copy "${output}" "#]"
+		-c copy "${output}"
+	_draw_line "-"
 	
 	# Start concatenating.
 	ffmpeg -v error -hide_banner -stats \
@@ -131,6 +135,121 @@ _cnct_video() {
 		-c copy "${output}"
 	sync
 }
+
+###################################################################################################
+# Encodes video into 10bit HEVC.
+# Arguments:
+#   $1: Input video name.
+#   $2: Artist.
+#   $3: Title.
+# Return:
+#   A 10bit HEVC video.
+###################################################################################################
+_encode_video() {
+	local in_video="$1"
+	local in_artist="$2"
+	local in_title="$3"
+
+	local the_tags=
+	local tmp_choice=
+	local tmp_aspect=
+	local aspect_ratio=
+	local crf_value=
+	local preset=
+	local output=
+
+	# Change case of artist
+	local artist_to_pascal="$(_to_pascal "${in_artist}")"
+	local artist_to_lower="$(_to_lower "${in_artist}")"
+	artist_to_lower="${artist_to_lower/ /_}"
+
+	# Change case of title
+	local title_to_pascal="$(_to_pascal "${in_title}")"
+	local title_to_lower="$(_to_lower "${in_title}")"
+	title_to_lower="${title_to_lower/ /_}"
+
+	# Get tags from user.
+	_tags_list
+	read -p 'Choose Tags: ' "the_tags" # Get list of tags from user.
+	the_tags="${the_tags// /_}" # Replace space with _ char.
+
+	# Get aspect ratio from user.
+	echo
+	echo "Choose Aspect Ration:"
+	echo "  1) Normal (Default, press <ENTER> or 1"
+	echo "  2) 4:3    (1.33)"
+	echo "  3) 16:9   (1.77)"
+	echo "  4) 16:10  (1.6)"
+	echo "  5) 2.35:1 (2.35)"
+	echo "  9) Other"
+	read tmp_choice
+
+	if [[ ${tmp_choice} -eq 1 || -z ${tmp_choice} ]] ; then
+	    aspect_ratio=""
+
+	elif [[ ${tmp_choice} -eq 2 ]] ; then
+	    aspect_ratio="-aspect 4:3"
+
+	elif [[ ${tmp_choice} -eq 3 ]] ; then
+	    aspect_ratio="-aspect 16:9"
+
+	elif [[ ${tmp_choice} -eq 4 ]] ; then
+	    aspect_ratio="-aspect 16:10"
+
+	elif [[ ${tmp_choice} -eq 5 ]] ; then
+	    aspect_ratio="-aspect 2.35:1"
+
+	elif [[ ${tmp_choice} -eq 9 ]] ; then
+	    read -p 'Provide custom aspect ration: ' tmp_aspect
+	    aspect_ratio="-aspect ${aspect_ratio}"
+	fi
+
+	# Get CRF value.
+	echo
+	read -p 'Set crf to 23?: ' crf_value
+	if [[ -z ${crf_value} ]] ; then
+		crf_value=23
+	fi
+	echo "Selected CRF: ${crf_value}"
+
+	# Get encoding preset
+	echo
+	echo "Valid presets are ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow and placebo."
+	read -p 'Select your preset (Default is medium): ' preset
+	if [[ -z "${preset}" ]] ; then
+	    preset="medium"
+	fi
+	echo "Selected preset: ${preset}"
+
+	# Output filename
+	output="${artist_to_lower}-${title_to_lower}-${the_tags}.mp4"
+	if [[ -f "${output}" ]] ; then
+		output="${artist_to_lower}-${title_to_lower}-${the_tags}-$(date +%I%M%S).mp4"
+	fi
+
+	echo
+	echo time ffmpeg -v error -hide_banner -stats \
+		-i ${in_video} \
+		-c:v libx265 -crf:v ${crf_value} -preset ${preset} ${aspect_ratio} -pix_fmt yuv444p10le \
+		-c:a aac -b:a 128k -ar 48000 -ac 2 -threads 0 \
+		-x265-params log-level=error \
+		-metadata artist="${artist_to_pascal}" -metadata title="${title_to_pascal}" \
+		-f mp4 ${output}
+
+	_draw_line "-"
+
+	# Start enconding to HEVC
+	time ffmpeg -v error -hide_banner -stats \
+		-i ${in_video} \
+		-c:v libx265 -crf:v ${crf_value} -preset ${preset} ${aspect_ratio} -pix_fmt yuv444p10le \
+		-c:a aac -b:a 128k -ar 48000 -ac 2 -threads 0 \
+		-x265-params log-level=error \
+		-metadata artist="${artist_to_pascal}" -metadata title="${title_to_pascal}" \
+		-f mp4 ${output}
+	
+	sync
+}
+
 
 ###################################################################################################
 # Shows short info of video file(s).
@@ -297,6 +416,34 @@ _mount_dir() {
 			exit 1
 		fi
 	fi
+}
+
+###################################################################################################
+# Raw video.
+# Arguments:
+#   $1: Input video file.
+# Return:
+#   Rawvideo.
+###################################################################################################
+_raw_video() {
+	in_video="$1"
+
+	local output=
+	output="_R$(date +%H%M%S).avi" # Output rawvideo filename.
+
+	echo ffmpeg -v error -hide_banner -stats \
+		-i ${in_video} \
+		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p -vf shuffleplanes=0:2:1 \
+		-c:a pcm_s16le -ar 48000 -ac 2 \
+		-f avi ${output}
+	_draw_line "-"
+
+	ffmpeg -v error -hide_banner -stats \
+		-i ${in_video} \
+		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p -vf shuffleplanes=0:2:1 \
+		-c:a pcm_s16le -ar 48000 -ac 2 \
+		-f avi ${output}
+	sync
 }
 
 ###################################################################################################
@@ -467,20 +614,24 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":ha:c:f:i:j:m:s:tu:v:" opt ; do
+while getopts ":ha:c:e:f:i:j:m:r:s:tu:v:A:T:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
 		h) _help_show ;;
 		a) audio_file="$OPTARG" ;;
 		c) cnct_video+=("$OPTARG") ;;
+		e) encode_video="$OPTARG" ;;
 		f) fade_audio="$OPTARG" ;;
 		i) info_video+=("$OPTARG") ;;
 		j) join_video+=("$OPTARG") ;;
 		m) mount_dir="$OPTARG" ;;
+		r) raw_video="$OPTARG" ;;
 		s) slow_video="$OPTARG" ;;
 		t) _tags_list ;;
 		u) umount_dir="$OPTARG" ;;
 		v) volume="$OPTARG" ;;
+		A) artist_name="$OPTARG" ;;
+		T) title_name="$OPTARG" ;;
 		:) echo "Error: -$OPTARG requires an argument" ; exit 1 ;;
 		?) echo "Error: unknown option -$OPTARG" ; exit 1 ;;
 	esac
@@ -491,6 +642,11 @@ shift "$((OPTIND-1))"
 # Concatenate Videos function.
 if [[ -n "${cnct_video[@]}" && "${#cnct_video[@]}" -gt 1 ]] ; then
 	_cnct_video "${cnct_video[@]}"
+fi
+
+# Encode Videos to HEVC.
+if [[ -n "${encode_video}" && -n "${artist_name}" && -n "${title_name}" ]] ; then
+	_encode_video "${encode_video}" "${artist_name}" "${title_name}"
 fi
 
 # Info Videos function.
@@ -517,6 +673,11 @@ elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -z "${volume}" && -n "${f
 # Join Videos function with videos, audio, volume and fade-out.
 elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -n "${volume}" && -n "${fade_audio}" ]] ; then
 	_join_video "${audio_file}" "${volume}" "${fade_audio}" "${join_video[@]}" 
+fi
+
+# Raw video.
+if [[ ! -z "$raw_video" ]] ; then
+	_raw_video "${raw_video}"
 fi
 
 # Mount device into a folder.
