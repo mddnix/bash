@@ -129,6 +129,7 @@ _cnct_video() {
 	ffmpeg -v error -hide_banner -stats \
 		-i concat:"${files}" \
 		-c copy "${output}"
+	sync
 }
 
 ###################################################################################################
@@ -176,7 +177,6 @@ _join_video() {
 
 
 	# Find duration of all videos + Join video filenames with '|' inbetween them.
-	_draw_line "-"
 	for i in "${in_video[@]}" ; do
 		get_video_info=($(mediainfo --fullscreen \
 			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Duration%" "$i"))
@@ -239,6 +239,7 @@ _join_video() {
 		${afilter} \
 		-map 0:v -map 1:a \
 		${output}
+	sync
 }
 
 ###################################################################################################
