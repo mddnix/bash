@@ -63,7 +63,7 @@ trap '_trap_cleanup' SIGHUP SIGINT SIGQUIT SIGQUIT SIGTERM
 ###################################################################################################
 _help_show() {
 cat <<HELP
-Usage: 
+Usage:
  ${SCRIPT_NAME} [OPTIONS]...
 
 Options:
@@ -93,6 +93,7 @@ HELP
 ###################################################################################################
 _cnct_video() {
 	local files=
+	local extn="$1"
 	local output=
 	local ctr=1
 	local sec=0
@@ -102,11 +103,11 @@ _cnct_video() {
 
 	# Club video filenames with '|' inbetween them.
 	for i ; do
-		get_video_info=( "$(mediainfo --fullscreen \
-			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Format% %Duration%" "$i")" )
+		get_video_info=( $(mediainfo --fullscreen \
+			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Format% %Duration%" "$i") )
 		
-		get_audio_info=( "$(mediainfo --fullscreen \
-			--Inform="Audio;%Format% %SamplingRate% %Channel(s)%" "$i")" )
+		get_audio_info=( $(mediainfo --fullscreen \
+			--Inform="Audio;%Format% %SamplingRate% %Channel(s)%" "$i") )
 
 		# Print video information
 		printf "%2d %8s %7s  %-7s %-7s %5s %3s %6.2f  %s\n" \
@@ -125,7 +126,7 @@ _cnct_video() {
 	done
 	echo "TOTAL: ${secs}"
 	files=${files#|*} # Remove '|' at beginning.
-	output="_C$(date +%H%M%S).avi" # Concatenated avi output filename.
+	output="_C$(date +%H%M%S).${extn#*.}" # Concatenated avi output filename.
 
 	# Print output command for reference
 	_draw_line "-"
@@ -282,7 +283,7 @@ _info_video() {
 #   $1: Audio file.
 #   $2: Volume level.
 #   $3: Fadeout seconds.
-#   $4...: Video file(s). 
+#   $4...: Video file(s).
 # Return:
 #   Joined video witj custom audio file.
 ###################################################################################################
@@ -311,7 +312,7 @@ _join_video() {
 			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Duration%" "$i")" )
 
 		sec=$(echo "${get_video_info[2]}/1000"|bc -l) # Duration of each videos.
-		
+
 		secs=$(echo "scale=2;($secs+$sec)/1"|bc -l) # Total duration of all video files.
 		files="$files|$i" # Join video filename with '|' inbetween.
 
@@ -321,7 +322,7 @@ _join_video() {
 			"${get_video_info[0]}" \
 			"${get_video_info[1]}" \
 			"${sec}" \
-			"${i}" 
+			"${i}"
 	done
 	echo "TOTAL: ${secs} seconds"
 	files=${files#|*} # Trim beginning | character.
@@ -411,7 +412,7 @@ _mount_dir() {
 		exit 1
 	else
 		# Check if are in mount directory.
-		if [[ "$PWD" = "${dir_name}" ]] ; then # You are inside mount point is TRUE. 
+		if [[ "$PWD" = "${dir_name}" ]] ; then # You are inside mount point is TRUE.
 			echo "You are inside the mount directory ${dir_name}. Change directory and try again."
 			exit 1
 		fi
@@ -479,7 +480,7 @@ _slow_video() {
 	get_info=$(mediainfo --fullscan --Inform="Video;%Duration% %FrameRate%" "$input") # 3504.000000 23.976
 	sec=$(echo "scale=3;${get_info% *}/1000"|bc -l) # 3.504
 	fps=${get_info#* }                              # 23.976
-	calc_total_frames=$(echo "$sec*$fps"|bc -l)     # 84.011904 
+	calc_total_frames=$(echo "$sec*$fps"|bc -l)     # 84.011904
 	orig_frame=${calc_total_frames%.*}              # 84
 	frm=$(( orig_frame - 2 ))                       # 82
 	#echo "$input | $get_info | $sec | $fps | $calc_total_frames | $orig_frame | $frm"
@@ -624,7 +625,7 @@ _umount_dir() {
 		if [[ $(sudo fuser --mount "${dir_name}") ]] ; then
 			sudo fuser -kvi "${dir_name}" # Kill all busy processes interactively.
 		fi
-		
+
 		# Lazy umount the directory, then, if successful, close LUKS
 		if sudo umount -l "${dir_name}" ; then
 			if sudo cryptsetup close "${map_name}" ; then # Close LUKS
@@ -644,10 +645,8 @@ while getopts ":ha:c:e:f:i:j:m:r:s:tu:v:A:T:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
 		h) _help_show ;;
-		a) audio_file="$OPTARG" ;;
 		c) cnct_video+=("$OPTARG") ;;
 		e) encode_video="$OPTARG" ;;
-		f) fade_audio="$OPTARG" ;;
 		i) info_video+=("$OPTARG") ;;
 		j) join_video+=("$OPTARG") ;;
 		m) mount_dir="$OPTARG" ;;
@@ -655,68 +654,76 @@ while getopts ":ha:c:e:f:i:j:m:r:s:tu:v:A:T:" opt ; do
 		s) slow_video="$OPTARG" ;;
 		t) _tags_list ;;
 		u) umount_dir="$OPTARG" ;;
+
+		a) audio_file="$OPTARG" ;;
+		f) fade_audio="$OPTARG" ;;
 		v) volume="$OPTARG" ;;
 		A) artist_name="$OPTARG" ;;
 		T) title_name="$OPTARG" ;;
+
 		:) echo "Error: -$OPTARG requires an argument" ; exit 1 ;;
 		?) echo "Error: unknown option -$OPTARG" ; exit 1 ;;
 	esac
 done
 shift "$((OPTIND-1))"
 
-
-# Concatenate Videos function.
-if [[ -n "${cnct_video[@]}" && "${#cnct_video[@]}" -gt 1 ]] ; then
+if [[ "${#cnct_video[@]}" -ne 0 ]] ; then # Concatenate Videos function.
 	_cnct_video "${cnct_video[@]}"
 fi
 
-# Encode Videos to HEVC.
-if [[ -n "${encode_video}" && -n "${artist_name}" && -n "${title_name}" ]] ; then
-	_encode_video "${encode_video}" "${artist_name}" "${title_name}"
-fi
 
-# Info Videos function.
-if [[ -n "${info_video[@]}" ]] ; then
-	_info_video "${info_video[@]}" 
-fi
-
-# Join Videos function with only videos.
-if [[ -n "${join_video[@]}" && -z "${audio_file}" && -z "${volume}" && -z "${fade_audio}" ]] ; then
-	_join_video "" "" "" "${join_video[@]}"
-
-# Join Videos function with videos and audio.
-elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -z "${volume}" && -z "${fade_audio}" ]] ; then
-	_join_video "${audio_file}" "" "" "${join_video[@]}" 
-
-# Join Videos function with videos, audio and volume.
-elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -n "${volume}" && -z "${fade_audio}" ]] ; then
-	_join_video "${audio_file}" "${volume}" "" "${join_video[@]}" 
-
-# Join Videos function with videos, audio and fade-out.
-elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -z "${volume}" && -n "${fade_audio}" ]] ; then
-	_join_video "${audio_file}" "" "${fade_audio}" "${join_video[@]}" 
-
-# Join Videos function with videos, audio, volume and fade-out.
-elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -n "${volume}" && -n "${fade_audio}" ]] ; then
-	_join_video "${audio_file}" "${volume}" "${fade_audio}" "${join_video[@]}" 
-fi
-
-# Raw video.
-if [[ -n "${raw_video}" ]] ; then
-	_raw_video "${raw_video}"
-fi
-
-# Mount device into a folder.
-if [[ -n "${mount_dir}" ]] ; then
-	_mount_dir "${mount_dir}"
-fi
-
-# Slowmotion videos.
-if [[ -n "${slow_video}" ]] ; then
-	_slow_video "${slow_video}"
-fi
-
-# Unmount device from folder.
-if [[ -n "${umount_dir}" ]] ; then
-	_umount_dir "${umount_dir}"
-fi
+## Concatenate Videos function.
+#if [[ -n "${cnct_video[@]}" && "${#cnct_video[@]}" -gt 1 ]] ; then
+#	_cnct_video "${cnct_video[@]}"
+#fi
+#
+## Encode Videos to HEVC.
+#if [[ -n "${encode_video}" && -n "${artist_name}" && -n "${title_name}" ]] ; then
+#	_encode_video "${encode_video}" "${artist_name}" "${title_name}"
+#fi
+#
+## Info Videos function.
+#if [[ -n "${info_video[@]}" ]] ; then
+#	_info_video "${info_video[@]}"
+#fi
+#
+## Join Videos function with only videos.
+#if [[ -n "${join_video[@]}" && -z "${audio_file}" && -z "${volume}" && -z "${fade_audio}" ]] ; then
+#	_join_video "" "" "" "${join_video[@]}"
+#
+## Join Videos function with videos and audio.
+#elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -z "${volume}" && -z "${fade_audio}" ]] ; then
+#	_join_video "${audio_file}" "" "" "${join_video[@]}"
+#
+## Join Videos function with videos, audio and volume.
+#elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -n "${volume}" && -z "${fade_audio}" ]] ; then
+#	_join_video "${audio_file}" "${volume}" "" "${join_video[@]}"
+#
+## Join Videos function with videos, audio and fade-out.
+#elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -z "${volume}" && -n "${fade_audio}" ]] ; then
+#	_join_video "${audio_file}" "" "${fade_audio}" "${join_video[@]}"
+#
+## Join Videos function with videos, audio, volume and fade-out.
+#elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -n "${volume}" && -n "${fade_audio}" ]] ; then
+#	_join_video "${audio_file}" "${volume}" "${fade_audio}" "${join_video[@]}"
+#fi
+#
+## Raw video.
+#if [[ -n "${raw_video}" ]] ; then
+#	_raw_video "${raw_video}"
+#fi
+#
+## Mount device into a folder.
+#if [[ -n "${mount_dir}" ]] ; then
+#	_mount_dir "${mount_dir}"
+#fi
+#
+## Slowmotion videos.
+#if [[ -n "${slow_video}" ]] ; then
+#	_slow_video "${slow_video}"
+#fi
+#
+## Unmount device from folder.
+#if [[ -n "${umount_dir}" ]] ; then
+#	_umount_dir "${umount_dir}"
+#fi
