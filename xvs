@@ -41,6 +41,8 @@ artist_name=
 title_name=
 encode_video=
 raw_video=
+katri_video=
+Katri_video=
 
 # Check if necessary commands are installed
 # -----------------------------------------
@@ -459,6 +461,33 @@ _join_video() {
 }
 
 ###################################################################################################
+# Clips a part of video.
+# $1: Array of start and end points.
+# Return:
+#   Clipped video
+###################################################################################################
+_katri_video() {
+	local in_video="$1"
+	local extn="${in_video##*.}"
+	local in_clip="$2"
+	read -r -a array <<< "$in_clip"
+	local krnd="_K$RANDOM.${extn}"
+
+	ffmpeg -v info -hide_banner -stats \
+		-i "${in_video}" \
+		-ss "${array[0]}" \
+		-to "${array[1]}" \
+		-c:v copy \
+		-c:a copy \
+		-map 0:0 \
+		-map "${array[2]}" \
+		-sn \
+		-map_chapters -1 \
+		"${krnd}"
+}
+
+
+###################################################################################################
 # Mounts the LUKS partition into a directory. Creates directory if necessary.
 # Globals/Constants:
 #   XDEV, XDIR, XMAP, XUSR, NDEV, NDIR, NMAP, NUSR
@@ -731,7 +760,7 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":ha:c:d:e:f:i:j:m:r:s:tu:v:A:T:" opt ; do
+while getopts ":ha:c:d:e:f:i:j:k:m:r:s:tu:v:A:K:T:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
 		h) _help_show ;;
@@ -740,6 +769,7 @@ while getopts ":ha:c:d:e:f:i:j:m:r:s:tu:v:A:T:" opt ; do
 		e) encode_video="$OPTARG" ;;
 		i) info_video+=("$OPTARG") ;;
 		j) join_video+=("$OPTARG") ;;
+		k) katri_video="$OPTARG" ;;
 		m) mount_dir="$OPTARG" ;;
 		r) raw_video="$OPTARG" ;;
 		s) slow_video="$OPTARG" ;;
@@ -750,6 +780,7 @@ while getopts ":ha:c:d:e:f:i:j:m:r:s:tu:v:A:T:" opt ; do
 		f) fade_audio="$OPTARG" ;;
 		v) volume="$OPTARG" ;;
 		A) artist_name="$OPTARG" ;;
+		K) Katri_video="$OPTARG" ;;
 		T) title_name="$OPTARG" ;;
 
 		:) echo "Error: -$OPTARG requires an argument" ; exit 1 ;;
@@ -772,6 +803,9 @@ elif [[ "${#info_video[@]}" -ne 0 ]] ; then # Info Videos function.
 
 elif [[ "${#join_video[@]}" -ne 0 ]] ; then # Join Videos.
 	_join_video "${audio_file}" "${volume}" "${fade_audio}" "${join_video[@]}"
+
+elif [[ -n "${katri_video}" && -n "${Katri_video}" ]] ; then # Clip Videos.
+	_katri_video "${katri_video}" "${Katri_video}"
 
 elif [[ -n "${mount_dir}" ]] ; then # Mount device into a folder.
 	_mount_dir "${mount_dir}"
