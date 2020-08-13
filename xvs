@@ -195,7 +195,7 @@ _dur_video() {
 	secs=$(echo "scale=3;${secs}/1000"|bc -l) # Seconds in 3 decimal format.
 	clks=$(date -d@"${secs}" -u +%H:%M:%S.%3N) # In clock format of all video files.
 	_draw_line "-" 30
-	echo "T: $(date -d@"${secs}" -u +%H:%M:%S.%3N) (${secs})"
+	echo "T: $(date -d@"${secs}" -u +%H:%M:%S.%3N) ("${secs}")"
 }
 
 ###################################################################################################

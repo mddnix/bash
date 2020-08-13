@@ -132,3 +132,37 @@ _title_header() {
 	                                                                                                       
 	echo "${var_left}${var_cent}${var_right}" # Print total header line                              
 }
+
+
+###################################################################################################
+# Make string to white bold.
+# Arguments:
+#   $1: String.
+#   $2: Color
+# Return:
+#   Bold Color string.
+###################################################################################################
+_to_color() {
+	str="$1"                                                                                               
+	col="$2"                                                                                            
+	                                                                                                    
+	# Bold Colors:                                                                                      
+	BLUE='\e[1;34m'   # Blue Color                                                                      
+	RED='\e[1;31m'    # Red Color                                                                       
+	WHITE='\e[1;97m'  # White Color                                                                     
+	YELLOW='\e[1;33m' # Yellow Color                                                                    
+	CRESET='\e[0m'    # Reset Color                                                                     
+	                                                                                                    
+	if [[ "${col}" =~ [Bb][Ll][Uu][Ee] ]] ; then                                                        
+	    printf "${BLUE}%s${CRESET}" "${str}"                                                            
+	                                                                                                    
+	elif [[ "${col}" =~ [Rr][Ee][Dd] ]] ; then                                                          
+	    printf "${RED}%s${CRESET}" "${str}"                                                             
+	                                                                                                    
+	elif [[ "${col}" =~ [Ww][Hh][Ii][Tt][Ee] ]] ; then                                                  
+	    printf "${WHITE}%s${CRESET}" "${str}"                                                           
+	                                                                                                    
+	elif [[ "${col}" =~ [Yy][Ee][Ll][Ll][Oo][Ww] ]] ; then                                              
+	    printf "${YELLOW}%s${CRESET}" "${str}"                                                          
+	fi 
+}
