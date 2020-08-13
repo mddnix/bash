@@ -54,6 +54,7 @@ _is_cmd "ffprobe"
 ###################################################################################################
 _trap_cleanup() {
 	echo "Oops! $(basename "$0") ($$) has terminated."
+	find "$PWD" -type f -name "__XVS*" -print -delete
 	exit 2
 }
 trap '_trap_cleanup' SIGHUP SIGINT SIGQUIT SIGQUIT SIGTERM
@@ -94,12 +95,15 @@ HELP
 _cnct_video() {
 	local files=
 	local extn="$1"
+	local tmp_file=
 	local output=
 	local ctr=1
 	local sec=0
 	local secs=0
 	declare -a get_video_info=()
 	declare -a get_audio_info=()
+
+	tmp_file="__XVSCNT$RANDOM.txt" # Temporary file.
 
 	# Club video filenames with '|' inbetween them.
 	for i ; do
@@ -108,6 +112,12 @@ _cnct_video() {
 		
 		get_audio_info=( $(mediainfo --fullscreen \
 			--Inform="Audio;%Format% %SamplingRate% %Channel(s)%" "$i") )
+
+		# Create text file for concat.
+		if ! echo "file '$i'" >> "${tmp_file}" ; then
+			echo "I/O Error: Could not create temporary file...exiting"
+			exit 1
+		fi
 
 		# Print video information
 		printf "%2d %8s %7s  %-7s %-7s %5s %3s %6.2f  %s\n" \
@@ -126,19 +136,26 @@ _cnct_video() {
 	done
 	echo "TOTAL: ${secs}"
 	files=${files#|*} # Remove '|' at beginning.
-	output="_C$(date +%H%M%S).${extn#*.}" # Concatenated avi output filename.
+	output="_C$(date +%H%M%S).${extn#*.}" # Concatenated output filename.
 
 	# Print output command for reference
 	_draw_line "-"
-	echo ffmpeg -v error -hide_banner -stats \
-		-i concat:"${files}" \
+	 echo ffmpeg -v error -hide_banner -stats \
+		-f concat -safe 0 \
+		-i "${tmp_file}" \
 		-c copy "${output}"
 	_draw_line "-"
 	
 	# Start concatenating.
 	ffmpeg -v error -hide_banner -stats \
-		-i concat:"${files}" \
+		-f concat -safe 0 \
+		-i "${tmp_file}" \
 		-c copy "${output}"
+
+	if ! rm "${tmp_file}" 2>/dev/null ; then
+		echo "Error: Could not remove temporary file ${tmp_file}".
+	fi
+
 	sync
 }
 
