@@ -28,6 +28,7 @@ readonly NUSR="neon"
 # ----------------
 declare -a info_video=()
 declare -a cnct_video=()
+declare -a join_video=()
 mount_dir=
 umount_dir=
 slow_video=
@@ -273,7 +274,7 @@ _encode_video() {
 	fi
 
 	echo
-	echo ffmpeg -v error -hide_banner -stats \
+	echo time ffmpeg -v error -hide_banner -stats \
 		-i "${in_video}" \
 		-c:v libx265 -crf:v "${crf_value}" -preset "${preset}" ${aspect_ratio} -pix_fmt yuv444p10le \
 		-c:a aac -b:a 128k -ar 48000 -ac 2 -threads 0 \
@@ -294,7 +295,6 @@ _encode_video() {
 
 	sync
 }
-
 
 ###################################################################################################
 # Shows short info of video file(s).
@@ -331,24 +331,32 @@ _join_video() {
 	declare -a get_video_info=()
 	local ctr=1
 	local files=    # Holds concatenated file name(s).
+	local tmp_file= # Temp file.
 	local sec=0     # Holds seconds of individual video file.
 	local secs=0    # Holds Total duration in seconds of all files.
 	local bg_audio= # Holds background audio file.
 	local afilter=  # Holds audio filter.
 	local end_dur=  # Holds total seconds - 1.
 	local output=   # Joined avi output filename.
-	output="_J$(date +%H%M%S).avi" # Output joined video filename.
 
+	tmp_file="__XVSJOIN$RANDOM.txt" # Temporary file.
+	output="_J$(date +%H%M%S).avi" # Output joined video filename.
 
 	# Find duration of all videos + Join video filenames with '|' inbetween them.
 	for i in "${in_video[@]}" ; do
-		get_video_info=( "$(mediainfo --fullscreen \
-			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Duration%" "$i")" )
+		get_video_info=( $(mediainfo --fullscreen \
+			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Duration%" "$i") )
 
 		sec=$(echo "${get_video_info[2]}/1000"|bc -l) # Duration of each videos.
 
 		secs=$(echo "scale=2;($secs+$sec)/1"|bc -l) # Total duration of all video files.
 		files="$files|$i" # Join video filename with '|' inbetween.
+
+		# Create text file for join.
+		if ! echo "file '$i'" >> "${tmp_file}" ; then
+			echo "I/O Error: Could not create temporary file...exiting"
+			exit 1
+		fi
 
 		# Print video information
 		printf "%2d %8s %7s %6.2f %s\n" \
@@ -374,7 +382,7 @@ _join_video() {
 
 	elif [[ -n "${in_fade}" && -z "${in_volume}" ]] ; then # If only fadeout is given
 		end_dur=$(echo "scale=2;($secs-$in_fade)/1"|bc -l)
-		afilter="-af afade=in:st=0:d=1,afade=out:st=${end_dur}:d=${in_fade}"
+		afilter="-af afade=out:st=${end_dur}:d=${in_fade}"
 
 	elif [[ -n "${in_volume}" && -n "${in_fade}" ]] ; then # If both volume and fadeout is given
 		end_dur=$(echo "scale=2;($secs-$in_fade)/1"|bc -l)
@@ -384,8 +392,9 @@ _join_video() {
 	fi
 
 	_draw_line "-"
-	echo ffmpeg -v error -hide_banner -stats \
-		-i concat:"${files}" \
+	echo ffmpeg -v fatal -hide_banner -stats \
+		-f concat \
+		-i "${tmp_file}" \
 		${bg_audio} \
 		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p -vf shuffleplanes=0:2:1 \
 		-c:a pcm_s16le -ar 48000 -ac 2 \
@@ -395,14 +404,20 @@ _join_video() {
 	_draw_line "-"
 
 	# Start concatenating.
-	ffmpeg -v error -hide_banner -stats \
-		-i concat:"${files}" \
+	ffmpeg -v fatal -hide_banner -stats \
+		-f concat \
+		-i "${tmp_file}" \
 		${bg_audio} \
 		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p -vf shuffleplanes=0:2:1 \
 		-c:a pcm_s16le -ar 48000 -ac 2 \
 		${afilter} \
 		-map 0:v -map 1:a \
 		"${output}"
+
+	if ! rm "${tmp_file}" 2>/dev/null ; then
+		echo "Error: Could not remove temporary file ${tmp_file}".
+	fi
+
 	sync
 }
 
@@ -477,6 +492,7 @@ _raw_video() {
 	local output=
 	output="_R$(date +%H%M%S).avi" # Output rawvideo filename.
 
+	_draw_line "-"
 	echo ffmpeg -v error -hide_banner -stats \
 		-i "${input}" \
 		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p -vf shuffleplanes=0:2:1 \
@@ -489,6 +505,7 @@ _raw_video() {
 		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p -vf shuffleplanes=0:2:1 \
 		-c:a pcm_s16le -ar 48000 -ac 2 \
 		-f avi "${output}"
+
 	sync
 }
 
@@ -557,7 +574,8 @@ _slow_video() {
 
 	# Print output file details.
 	echo
-	echo ffmpeg -v error -hide_banner -stats \
+	_draw_line "-"
+	echo time ffmpeg -v error -hide_banner -stats \
 		-i "${input}" \
 		-f lavfi -i anullsrc -shortest \
 		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p \
@@ -566,11 +584,11 @@ _slow_video() {
 		-map 0:v -map 1:a \
 		-sn -map_chapters -1 \
 		-f avi "${output}"
+	_draw_line "-"
 	echo "%%% TARGET: ${output}, ${op_total_mfps} mfps, ${op_total_frames} frames, ${op_total_clk} duration. "
-	echo
 
 	# Start encoding slowmotion video
-	ffmpeg -v error -hide_banner -stats \
+	time ffmpeg -v error -hide_banner -stats \
 		-i "${input}" \
 		-f lavfi -i anullsrc -shortest \
 		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p \
@@ -579,6 +597,7 @@ _slow_video() {
 		-map 0:v -map 1:a \
 		-sn -map_chapters -1 \
 		-f avi "${output}"
+
 	sync
 }
 
@@ -706,61 +725,22 @@ if [[ "${#cnct_video[@]}" -ne 0 ]] ; then # Concatenate Videos function.
 
 elif [[ -n "${encode_video}" && -n "${artist_name}" ]] ; then    # Encode Videos to HEVC.
 	_encode_video "${encode_video}" "${artist_name}" "${title_name}"
+
+elif [[ "${#info_video[@]}" -ne 0 ]] ; then # Info Videos function.
+	_info_video "${info_video[@]}"
+
+elif [[ "${#join_video[@]}" -ne 0 ]] ; then # Join Videos.
+	_join_video "${audio_file}" "${volume}" "${fade_audio}" "${join_video[@]}"
+
+elif [[ -n "${mount_dir}" ]] ; then # Mount device into a folder.
+	_mount_dir "${mount_dir}"
+
+elif [[ -n "${raw_video}" ]] ; then # Convert to rawvideo.
+	_raw_video "${raw_video}"
+
+elif [[ -n "${slow_video}" ]] ; then # Slowmotion video
+	_slow_video "${slow_video}"
+
+elif [[ -n "${umount_dir}" ]] ; then # Un Mount device from folder.
+	_umount_dir "${umount_dir}"
 fi
-
-
-## Concatenate Videos function.
-#if [[ -n "${cnct_video[@]}" && "${#cnct_video[@]}" -gt 1 ]] ; then
-#	_cnct_video "${cnct_video[@]}"
-#fi
-#
-## Encode Videos to HEVC.
-#if [[ -n "${encode_video}" && -n "${artist_name}" && -n "${title_name}" ]] ; then
-#	_encode_video "${encode_video}" "${artist_name}" "${title_name}"
-#fi
-#
-## Info Videos function.
-#if [[ -n "${info_video[@]}" ]] ; then
-#	_info_video "${info_video[@]}"
-#fi
-#
-## Join Videos function with only videos.
-#if [[ -n "${join_video[@]}" && -z "${audio_file}" && -z "${volume}" && -z "${fade_audio}" ]] ; then
-#	_join_video "" "" "" "${join_video[@]}"
-#
-## Join Videos function with videos and audio.
-#elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -z "${volume}" && -z "${fade_audio}" ]] ; then
-#	_join_video "${audio_file}" "" "" "${join_video[@]}"
-#
-## Join Videos function with videos, audio and volume.
-#elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -n "${volume}" && -z "${fade_audio}" ]] ; then
-#	_join_video "${audio_file}" "${volume}" "" "${join_video[@]}"
-#
-## Join Videos function with videos, audio and fade-out.
-#elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -z "${volume}" && -n "${fade_audio}" ]] ; then
-#	_join_video "${audio_file}" "" "${fade_audio}" "${join_video[@]}"
-#
-## Join Videos function with videos, audio, volume and fade-out.
-#elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -n "${volume}" && -n "${fade_audio}" ]] ; then
-#	_join_video "${audio_file}" "${volume}" "${fade_audio}" "${join_video[@]}"
-#fi
-#
-## Raw video.
-#if [[ -n "${raw_video}" ]] ; then
-#	_raw_video "${raw_video}"
-#fi
-#
-## Mount device into a folder.
-#if [[ -n "${mount_dir}" ]] ; then
-#	_mount_dir "${mount_dir}"
-#fi
-#
-## Slowmotion videos.
-#if [[ -n "${slow_video}" ]] ; then
-#	_slow_video "${slow_video}"
-#fi
-#
-## Unmount device from folder.
-#if [[ -n "${umount_dir}" ]] ; then
-#	_umount_dir "${umount_dir}"
-#fi
