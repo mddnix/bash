@@ -27,6 +27,7 @@ readonly NUSR="neon"
 # Global variables
 # ----------------
 declare -a info_video=()
+declare -a cnct_video=()
 mount_dir=
 umount_dir=
 slow_video=
@@ -173,6 +174,10 @@ _encode_video() {
 	local in_artist="$2"
 	local in_title="$3"
 
+	#echo "*$in_video*"
+	#echo "*$in_artist*"
+	#echo "*$in_title*"
+
 	local artist_to_pascal=
 	local artist_to_lower=
 	local title_to_pascal=
@@ -192,14 +197,26 @@ _encode_video() {
 	artist_to_lower="${artist_to_lower/ /_}"
 
 	# Change case of title
-	title_to_pascal="$(_to_pascal "${in_title}")"
-	title_to_lower="$(_to_lower "${in_title}")"
-	title_to_lower="${title_to_lower/ /_}"
+	if [[ -n "${in_title}" ]] ; then
+		title_to_pascal="$(_to_pascal "${in_title}")"
+		title_to_lower="$(_to_lower "${in_title}")"
+		title_to_lower="-${title_to_lower/ /_}"
+	else
+		title_to_pascal=""
+		title_to_lower=""
+	fi
 
 	# Get tags from user.
 	_tags_list
 	read -r -p 'Choose Tags: ' "the_tags" # Get list of tags from user.
-	the_tags="${the_tags// /_}" # Replace space with _ char.
+
+	# If tags given, then append '-' at start and replace space with '_'.
+	if [[ -n "${the_tags}" ]] ; then
+		the_tags="-${the_tags// /_}"
+	else
+		the_tags=""
+	fi
+
 
 	# Get aspect ratio from user.
 	echo
@@ -250,9 +267,9 @@ _encode_video() {
 	echo "Selected preset: ${preset}"
 
 	# Output filename
-	output="${artist_to_lower}-${title_to_lower}-${the_tags}.mp4"
+	output="${artist_to_lower}${title_to_lower}${the_tags}.mp4"
 	if [[ -f "${output}" ]] ; then
-		output="${artist_to_lower}-${title_to_lower}-${the_tags}-$(date +%I%M%S).mp4"
+		output="${artist_to_lower}${title_to_lower}${the_tags}-$(date +%I%M%S).mp4"
 	fi
 
 	echo
@@ -686,6 +703,9 @@ shift "$((OPTIND-1))"
 
 if [[ "${#cnct_video[@]}" -ne 0 ]] ; then # Concatenate Videos function.
 	_cnct_video "${cnct_video[@]}"
+
+elif [[ -n "${encode_video}" && -n "${artist_name}" ]] ; then    # Encode Videos to HEVC.
+	_encode_video "${encode_video}" "${artist_name}" "${title_name}"
 fi
 
 
