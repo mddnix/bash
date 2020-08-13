@@ -14,8 +14,7 @@ set -o errexit # Exit script when command fails. Add '|| true' to allow fail.
 
 # Constant variables
 # ------------------
-readonly CURRENT_DIR="$PWD"
-readonly SCRIPT_NAME=$(basename $0)
+readonly SCRIPT_NAME="$(basename "$0")"
 readonly XDIR="/xd"
 readonly NDIR="/nd"
 readonly XDEV="/dev/sda4"
@@ -37,6 +36,8 @@ volume=
 raw_video=
 artist_name=
 title_name=
+encode_video=
+raw_video=
 
 # Check if necessary commands are installed
 # -----------------------------------------
@@ -52,10 +53,7 @@ _is_cmd "ffprobe"
 #   CURRENT_DIR
 ###################################################################################################
 _trap_cleanup() {
-	echo "Oops! $(basename $0) ($$) has terminated."
-	echo "Cleaning temporary files (if any)..."
-	find "${CURRENT_DIR}" -type f -name "tmp_xvs_*.mp4" -print -delete
-	echo "Done"
+	echo "Oops! $(basename "$0") ($$) has terminated."
 	exit 2
 }
 trap '_trap_cleanup' SIGHUP SIGINT SIGQUIT SIGQUIT SIGTERM
@@ -69,13 +67,20 @@ Usage:
  ${SCRIPT_NAME} [OPTIONS]...
 
 Options:
- -h            Help.   Show this help.
- -c [file]...  Concat. Concatenate several videos.
- -i [file]...  Info.   Show info of video(s).
- -m [xn]       Mount.  Mounts LUKS partition into directory.
- -s [file]     Slow.   Create slowmotion video.
- -t            Tags.   Display metadata tags.
- -u [xn]       Umount. Unmount LUKS partition from directory.
+ -h                                                Help. Show this help.
+ -c [file]...                                      Concat. Concatenate several videos.
+ -e [file] -A [artist] -T [title]                  Encode. Encodes file to 10bit HEVC.
+ -i [file]...                                      Info. Show info of video(s).
+ -j [file]...                                      Join. Join video with silent audio.
+    [file]... -a [audio]                           Join. Join video with audio file.
+    [file]... -a [audio] -v [volume]               Join. Join video/audio file with volume.
+    [file]... -a [audio] -f [fadeout]              Join. Join video/audio with fadeout.
+    [file]... -a [audio] -v [volume] -f [fadeout]  Join. Join video/audio with volume and fadeout.
+ -m [xn]                                           Mount. Mounts LUKS partition into directory.
+ -r [file]                                         Raw. Encode any video to rawvideo.
+ -s [file]                                         Slow. Create slowmotion video.
+ -t                                                Tags. Display metadata tags.
+ -u [xn]                                           Umount. Unmount LUKS partition from directory.
 HELP
 }
 
@@ -97,11 +102,11 @@ _cnct_video() {
 
 	# Club video filenames with '|' inbetween them.
 	for i ; do
-		get_video_info=($(mediainfo --fullscreen \
-			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Format% %Duration%" "$i"))
+		get_video_info=( "$(mediainfo --fullscreen \
+			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Format% %Duration%" "$i")" )
 		
-		get_audio_info=($(mediainfo --fullscreen \
-			--Inform="Audio;%Format% %SamplingRate% %Channel(s)%" "$i"))
+		get_audio_info=( "$(mediainfo --fullscreen \
+			--Inform="Audio;%Format% %SamplingRate% %Channel(s)%" "$i")" )
 
 		# Print video information
 		printf "%2d %8s %7s  %-7s %-7s %5s %3s %6.2f  %s\n" \
@@ -150,6 +155,11 @@ _encode_video() {
 	local in_artist="$2"
 	local in_title="$3"
 
+	local artist_to_pascal=
+	local artist_to_lower=
+	local title_to_pascal=
+	local title_to_lower=
+
 	local the_tags=
 	local tmp_choice=
 	local tmp_aspect=
@@ -159,18 +169,18 @@ _encode_video() {
 	local output=
 
 	# Change case of artist
-	local artist_to_pascal="$(_to_pascal "${in_artist}")"
-	local artist_to_lower="$(_to_lower "${in_artist}")"
+	artist_to_pascal="$(_to_pascal "${in_artist}")"
+	artist_to_lower="$(_to_lower "${in_artist}")"
 	artist_to_lower="${artist_to_lower/ /_}"
 
 	# Change case of title
-	local title_to_pascal="$(_to_pascal "${in_title}")"
-	local title_to_lower="$(_to_lower "${in_title}")"
+	title_to_pascal="$(_to_pascal "${in_title}")"
+	title_to_lower="$(_to_lower "${in_title}")"
 	title_to_lower="${title_to_lower/ /_}"
 
 	# Get tags from user.
 	_tags_list
-	read -p 'Choose Tags: ' "the_tags" # Get list of tags from user.
+	read -r -p 'Choose Tags: ' "the_tags" # Get list of tags from user.
 	the_tags="${the_tags// /_}" # Replace space with _ char.
 
 	# Get aspect ratio from user.
@@ -182,7 +192,7 @@ _encode_video() {
 	echo "  4) 16:10  (1.6)"
 	echo "  5) 2.35:1 (2.35)"
 	echo "  9) Other"
-	read tmp_choice
+	read -r tmp_choice
 
 	if [[ ${tmp_choice} -eq 1 || -z ${tmp_choice} ]] ; then
 	    aspect_ratio=""
@@ -197,16 +207,16 @@ _encode_video() {
 	    aspect_ratio="-aspect 16:10"
 
 	elif [[ ${tmp_choice} -eq 5 ]] ; then
-	    aspect_ratio="-aspect 2.35:1"
+	    aspect_ratio="-aspect 2.35"
 
 	elif [[ ${tmp_choice} -eq 9 ]] ; then
-	    read -p 'Provide custom aspect ration: ' tmp_aspect
-	    aspect_ratio="-aspect ${aspect_ratio}"
+	    read -r -p 'Provide custom aspect ration: ' tmp_aspect
+	    aspect_ratio="-aspect ${tmp_aspect}"
 	fi
 
 	# Get CRF value.
 	echo
-	read -p 'Set crf to 23?: ' crf_value
+	read -r -p 'Set crf to 23?: ' crf_value
 	if [[ -z ${crf_value} ]] ; then
 		crf_value=23
 	fi
@@ -215,7 +225,7 @@ _encode_video() {
 	# Get encoding preset
 	echo
 	echo "Valid presets are ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow and placebo."
-	read -p 'Select your preset (Default is medium): ' preset
+	read -r -p 'Select your preset (Default is medium): ' preset
 	if [[ -z "${preset}" ]] ; then
 	    preset="medium"
 	fi
@@ -228,25 +238,25 @@ _encode_video() {
 	fi
 
 	echo
-	echo time ffmpeg -v error -hide_banner -stats \
-		-i ${in_video} \
-		-c:v libx265 -crf:v ${crf_value} -preset ${preset} ${aspect_ratio} -pix_fmt yuv444p10le \
+	echo ffmpeg -v error -hide_banner -stats \
+		-i "${in_video}" \
+		-c:v libx265 -crf:v "${crf_value}" -preset "${preset}" ${aspect_ratio} -pix_fmt yuv444p10le \
 		-c:a aac -b:a 128k -ar 48000 -ac 2 -threads 0 \
 		-x265-params log-level=error \
 		-metadata artist="${artist_to_pascal}" -metadata title="${title_to_pascal}" \
-		-f mp4 ${output}
+		-f mp4 "${output}"
 
 	_draw_line "-"
 
 	# Start enconding to HEVC
 	time ffmpeg -v error -hide_banner -stats \
-		-i ${in_video} \
-		-c:v libx265 -crf:v ${crf_value} -preset ${preset} ${aspect_ratio} -pix_fmt yuv444p10le \
+		-i "${in_video}" \
+		-c:v libx265 -crf:v "${crf_value}" -preset "${preset}" ${aspect_ratio} -pix_fmt yuv444p10le \
 		-c:a aac -b:a 128k -ar 48000 -ac 2 -threads 0 \
 		-x265-params log-level=error \
 		-metadata artist="${artist_to_pascal}" -metadata title="${title_to_pascal}" \
-		-f mp4 ${output}
-	
+		-f mp4 "${output}"
+
 	sync
 }
 
@@ -261,7 +271,7 @@ _encode_video() {
 _info_video() {
 	for i ; do
 		echo "${i}:" # Print video file name
-		ffprobe "${i}" 2>&1 | egrep "Duration|Stream" # ffprobe short info
+		ffprobe "${i}" 2>&1 | grep -E "Duration|Stream" # ffprobe short info
 		echo
 	done
 }
@@ -297,8 +307,8 @@ _join_video() {
 
 	# Find duration of all videos + Join video filenames with '|' inbetween them.
 	for i in "${in_video[@]}" ; do
-		get_video_info=($(mediainfo --fullscreen \
-			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Duration%" "$i"))
+		get_video_info=( "$(mediainfo --fullscreen \
+			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Duration%" "$i")" )
 
 		sec=$(echo "${get_video_info[2]}/1000"|bc -l) # Duration of each videos.
 		
@@ -346,7 +356,7 @@ _join_video() {
 		-c:a pcm_s16le -ar 48000 -ac 2 \
 		${afilter} \
 		-map 0:v -map 1:a \
-		${output}
+		"${output}"
 	_draw_line "-"
 
 	# Start concatenating.
@@ -357,7 +367,7 @@ _join_video() {
 		-c:a pcm_s16le -ar 48000 -ac 2 \
 		${afilter} \
 		-map 0:v -map 1:a \
-		${output}
+		"${output}"
 	sync
 }
 
@@ -402,7 +412,7 @@ _mount_dir() {
 		exit 1
 	else
 		# Check if are in mount directory.
-		if [[ "$(echo $PWD)" = "${dir_name}" ]] ; then # You are inside mount point is TRUE. 
+		if [[ "$PWD" = "${dir_name}" ]] ; then # You are inside mount point is TRUE. 
 			echo "You are inside the mount directory ${dir_name}. Change directory and try again."
 			exit 1
 		fi
@@ -426,23 +436,22 @@ _mount_dir() {
 #   Rawvideo.
 ###################################################################################################
 _raw_video() {
-	in_video="$1"
-
+	local input="$1"
 	local output=
 	output="_R$(date +%H%M%S).avi" # Output rawvideo filename.
 
 	echo ffmpeg -v error -hide_banner -stats \
-		-i ${in_video} \
+		-i "${input}" \
 		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p -vf shuffleplanes=0:2:1 \
 		-c:a pcm_s16le -ar 48000 -ac 2 \
-		-f avi ${output}
+		-f avi "${output}"
 	_draw_line "-"
 
 	ffmpeg -v error -hide_banner -stats \
-		-i ${in_video} \
+		-i "${input}" \
 		-c:v rawvideo -vtag YV12 -pix_fmt yuv420p -vf shuffleplanes=0:2:1 \
 		-c:a pcm_s16le -ar 48000 -ac 2 \
-		-f avi ${output}
+		-f avi "${output}"
 	sync
 }
 
@@ -676,21 +685,21 @@ elif [[ -n "${join_video[@]}" && -n "${audio_file}" && -n "${volume}" && -n "${f
 fi
 
 # Raw video.
-if [[ ! -z "$raw_video" ]] ; then
+if [[ -n "${raw_video}" ]] ; then
 	_raw_video "${raw_video}"
 fi
 
 # Mount device into a folder.
-if [[ ! -z "$mount_dir" ]] ; then
+if [[ -n "${mount_dir}" ]] ; then
 	_mount_dir "${mount_dir}"
 fi
 
 # Slowmotion videos.
-if [[ ! -z "$slow_video" ]] ; then
+if [[ -n "${slow_video}" ]] ; then
 	_slow_video "${slow_video}"
 fi
 
 # Unmount device from folder.
-if [[ ! -z "$umount_dir" ]] ; then
+if [[ -n "${umount_dir}" ]] ; then
 	_umount_dir "${umount_dir}"
 fi
