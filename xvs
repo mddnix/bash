@@ -26,8 +26,9 @@ readonly NUSR="neon"
 
 # Global variables
 # ----------------
-declare -a info_video=()
 declare -a cnct_video=()
+declare -a dur_video=()
+declare -a info_video=()
 declare -a join_video=()
 mount_dir=
 umount_dir=
@@ -72,6 +73,7 @@ Usage:
 Options:
  -h                                                Help. Show this help.
  -c [file]...                                      Concat. Concatenate several videos.
+ -d [file]...                                      Duration. Duration of combined video files.
  -e [file] -A [artist] -T [title]                  Encode. Encodes file to 10bit HEVC.
  -i [file]...                                      Info. Show info of video(s).
  -j [file]...                                      Join. Join video with silent audio.
@@ -159,6 +161,41 @@ _cnct_video() {
 	fi
 
 	sync
+}
+
+###################################################################################################
+# Duration of videos.
+# Arguments:
+#   $1...: Array of input video file.
+# Return:
+#   Duration of all video file combined.
+###################################################################################################
+_dur_video() {
+
+	local get_video_sec=
+	local sec=0
+	local clk=
+	local secs=0
+	local clks=
+	local ctr=1
+
+	for i ; do
+		get_video_sec="$(mediainfo --fullscreen --Inform="Video;%Duration%" "$i")"
+
+		sec=$(echo "${get_video_sec}/1000"|bc -l) # Seconds of each video.
+		clk=$(date -d@"${sec}" -u +%H:%M:%S.%3N)  # In clock type.
+		secs=$(echo "${secs}+${get_video_sec}"|bc -l) # Total seconds of all files.
+
+		# Print video information
+		printf "%2d %12s  %s\n" \
+			$(( ctr++ )) \
+			"${clk}" \
+			"$i"
+	done
+	secs=$(echo "scale=3;${secs}/1000"|bc -l) # Seconds in 3 decimal format.
+	clks=$(date -d@"${secs}" -u +%H:%M:%S.%3N) # In clock format of all video files.
+	_draw_line "-" 30
+	echo "T: $(date -d@"${secs}" -u +%H:%M:%S.%3N) (${secs})"
 }
 
 ###################################################################################################
@@ -694,11 +731,12 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":ha:c:e:f:i:j:m:r:s:tu:v:A:T:" opt ; do
+while getopts ":ha:c:d:e:f:i:j:m:r:s:tu:v:A:T:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
 		h) _help_show ;;
 		c) cnct_video+=("$OPTARG") ;;
+		d) dur_video+=("$OPTARG") ;;
 		e) encode_video="$OPTARG" ;;
 		i) info_video+=("$OPTARG") ;;
 		j) join_video+=("$OPTARG") ;;
@@ -722,6 +760,9 @@ shift "$((OPTIND-1))"
 
 if [[ "${#cnct_video[@]}" -ne 0 ]] ; then # Concatenate Videos function.
 	_cnct_video "${cnct_video[@]}"
+
+elif [[ "${#dur_video[@]}" -ne 0 ]] ; then # Find duration of all videos.
+	_dur_video "${dur_video[@]}"
 
 elif [[ -n "${encode_video}" && -n "${artist_name}" ]] ; then    # Encode Videos to HEVC.
 	_encode_video "${encode_video}" "${artist_name}" "${title_name}"
