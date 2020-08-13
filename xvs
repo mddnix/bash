@@ -397,10 +397,9 @@ _mount_dir() {
 	# Check if mount directory already (not) exist.
 	if [[ ! -d "${dir_name}" ]] ; then
 		echo "Directory '${dir_name}' does not exist. Creating it..."
-		sudo install -o "${usr_name}" -g "${usr_name}" -m 0770 -d "${dir_name}" # Create dirctory.
-		if [[ $? -eq 0 ]] ; then
-			echo "...Done." 
-		else 
+		if sudo install -o "${usr_name}" -g "${usr_name}" -m 0770 -d "${dir_name}" ; then
+			echo "...Done."
+		else
 			echo "Error: Couldn't create directory ${dir_name}."
 			exit 1
 		fi
@@ -417,12 +416,15 @@ _mount_dir() {
 			exit 1
 		fi
 		echo "Mounting ${dev_name} into ${dir_name} ..."
-		sudo cryptsetup open --type luks2 "${dev_name}" "${map_name}" # Open LUKS device.
-		sudo mount "/dev/mapper/${map_name}" "${dir_name}" # Mount LUKS device in a directory.
-		if [[ $? -eq 0 ]] ; then
-			echo "${dir_name} mounted. Ready to use."
+		if sudo cryptsetup open --type luks2 "${dev_name}" "${map_name}" ; then # LUKS open.
+			if sudo mount "/dev/mapper/${map_name}" "${dir_name}" ; then # Mount LUKS device.
+				echo "${dir_name} mounted. Ready to use."
+			else
+				echo "Error: Couldn't mount ${dir_name}... Exiting."
+				exit 1
+			fi
 		else
-			echo "Error: Couldn't mount ${dir_name}... Exiting."
+			echo "Error: Couldn't open LUKS partition... Exiting."
 			exit 1
 		fi
 	fi
@@ -464,13 +466,22 @@ _raw_video() {
 ###################################################################################################
 _slow_video() {
 	local input="$1" # vid.mkv
-	local get_info=$(mediainfo --fullscan \
-		--Inform="Video;%Duration% %FrameRate%" "$input") # 3504.000000 23.976
-	local sec=$(echo "scale=3;${get_info% *}/1000"|bc -l) # 3.504
-	local fps=${get_info#* }                              # 23.976
-	local calc_total_frames=$(echo "$sec*$fps"|bc -l)     # 84.011904 
-	local orig_frame=${calc_total_frames%.*}              # 84
-	local frm=$(( orig_frame - 2 ))                       # 82
+	local get_info=
+	local sec=
+	local fps=
+	local calc_total_frames=
+	local orig_frame=
+	local frm=
+	local tot_frm=
+	local tot_sec=
+	local tot_clk=
+
+	get_info=$(mediainfo --fullscan --Inform="Video;%Duration% %FrameRate%" "$input") # 3504.000000 23.976
+	sec=$(echo "scale=3;${get_info% *}/1000"|bc -l) # 3.504
+	fps=${get_info#* }                              # 23.976
+	calc_total_frames=$(echo "$sec*$fps"|bc -l)     # 84.011904 
+	orig_frame=${calc_total_frames%.*}              # 84
+	frm=$(( orig_frame - 2 ))                       # 82
 	#echo "$input | $get_info | $sec | $fps | $calc_total_frames | $orig_frame | $frm"
 
 	# Print header
@@ -481,26 +492,33 @@ _slow_video() {
 
 	# Give prediction for 20 seconds
 	for i in {1..20} ; do
-		local tot_frm=$(( i*frm )) # First iteration: (1x82)=82
-		local tot_sec=$(echo "scale=2;$tot_frm/$fps"|bc -l) # First iteration: (82/23.976)=3.42
-		local tot_clk=$(date -d@$tot_sec -u +%M:%S.%2N)
+		tot_frm=$(( i*frm )) # First iteration: (1x82)=82
+		tot_sec=$(echo "scale=2;$tot_frm/$fps"|bc -l) # First iteration: (82/23.976)=3.42
+		tot_clk=$(date -d@"${tot_sec}" -u +%M:%S.%2N)
 		printf "%4d%7d%8.2f%11s\n" "$i" "$tot_frm" "$tot_sec" "$tot_clk"
 	done
 
 	# Print tail and ask for slowmotion times.
 	_draw_line '-' 32
-	read -p "  n? " timesN
+	read -r -p "  n? " timesN
 	if [[ "${timesN}" = "q" ]] ; then
 		exit 0
 	fi
 
 	# Final variable calulation for output.
-	local op_total_frames=$(echo "scale=0;($timesN*$frm)/1"|bc -l) # Output video total frames.
-	local op_mid_mfps=$(echo "$timesN*$fps"|bc -l) # Required minterpolate fps (float).
-	local op_total_mfps=$(printf "%.f" $op_mid_mfps) # Output minterpolate fps (round).
-	local op_total_sec=$(echo "scale=2;$op_total_frames/$fps"|bc -l) # Output total seconds.
-	local op_total_clk=$(date -d@$op_total_sec -u +%M:%S.%2N) # output total time in clock.
-	local output="_S${input}_$(date +%H%M%S)_${timesN}_${op_total_sec}.avi" # Output raw avi filename.
+	local op_total_frames=
+	local op_mid_mfps=
+	local op_total_mfps=
+	local op_total_sec=
+	local op_total_clk=$
+	local output=
+
+	op_total_frames=$(echo "scale=0;($timesN*$frm)/1"|bc -l) # Output video total frames.
+	op_mid_mfps=$(echo "$timesN*$fps"|bc -l) # Required minterpolate fps (float).
+	op_total_mfps=$(printf "%.f" "${op_mid_mfps}") # Output minterpolate fps (round).
+	op_total_sec=$(echo "scale=2;$op_total_frames/$fps"|bc -l) # Output total seconds.
+	op_total_clk=$(date -d@"${op_total_sec}" -u +%M:%S.%2N) # output total time in clock.
+	output="_S${input}_$(date +%H%M%S)_${timesN}_${op_total_sec}.avi" # Output raw avi filename.
 
 	# Print output file details.
 	echo
@@ -555,7 +573,8 @@ EOF
 }
 
 	# Store decrypted tags in valriable. Needs password.
-	local var_tags=$(Tags | openssl aes-256-cbc -md sha256 -salt -pbkdf2 -iter 1024 -a -d 2>/dev/null)
+	local var_tags=
+	var_tags=$(Tags | openssl aes-256-cbc -md sha256 -salt -pbkdf2 -iter 1024 -a -d 2>/dev/null)
 	if [[ "${var_tags}" =~ Birthday ]] ; then
 		echo
 		_title_header "$(_to_upper 'Available Tags')" '>' '<'
@@ -592,7 +611,7 @@ _umount_dir() {
 	fi
 
 	# Check if are unmounting from source directory.
-	if [[ "$(echo $PWD)" = "${dir_name}" ]] ; then
+	if [[ "$PWD" = "${dir_name}" ]] ; then
 		echo "You are inside to-be un-mount directory ${dir_name}. Change directory and try again."
 		exit 1
 	fi
@@ -607,11 +626,9 @@ _umount_dir() {
 		fi
 		
 		# Lazy umount the directory, then, if successful, close LUKS
-		sudo umount -l "${dir_name}"
-		if [[ $? -eq 0 ]] ; then
-			sudo cryptsetup close "${map_name}" # Close LUKS
-			if [[ $? -eq 0 ]] ; then
-				echo ""${dir_name}" unmounted.. Done."
+		if sudo umount -l "${dir_name}" ; then
+			if sudo cryptsetup close "${map_name}" ; then # Close LUKS
+				echo "${dir_name} unmounted.. Done."
 			fi
 		fi
 	else
