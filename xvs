@@ -704,7 +704,6 @@ EOF
 	fi
 }
 
-
 ###################################################################################################
 # Unmounts the LUKS partition from a directory.
 # Globals/Constants:
