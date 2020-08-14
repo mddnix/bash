@@ -595,7 +595,7 @@ _slow_video() {
 	local tot_clk=
 
 	get_info=$(mediainfo --fullscan --Inform="Video;%Duration% %FrameRate%" "$input") # 3504.000000 23.976
-	sec=$(echo "scale=3;${get_info% *}/1000"|bc -l) # 3.504
+	sec=$(printf "%.2f" $(echo "scale=2;${get_info% *}/1000"|bc -l)) # 3.504
 	fps=${get_info#* }                              # 23.976
 	calc_total_frames=$(echo "$sec*$fps"|bc -l)     # 84.011904
 	orig_frame=${calc_total_frames%.*}              # 84
@@ -603,7 +603,7 @@ _slow_video() {
 	#echo "$input | $get_info | $sec | $fps | $calc_total_frames | $orig_frame | $frm"
 
 	# Print header
-	echo "%%% SOURCE: ${input}, ${sec} secs, ${fps} fps, ${orig_frame} frames."
+	echo "SOURCE: ${input}, ${sec} secs, ${fps} fps, ${orig_frame} frames."
 	_draw_line '=' 32
 	printf "%4s%8s%7s%9s\n" "#" "FRAME" "SECS" "TIME"
 	_draw_line '=' 32
@@ -611,7 +611,7 @@ _slow_video() {
 	# Give prediction for 20 seconds
 	for i in {1..20} ; do
 		tot_frm=$(( i*frm )) # First iteration: (1x82)=82
-		tot_sec=$(echo "scale=2;$tot_frm/$fps"|bc -l) # First iteration: (82/23.976)=3.42
+		tot_sec=$(printf "%.2f" $(echo "scale=2;$tot_frm/$fps"|bc -l)) # First iteration: (82/23.976)=3.42
 		tot_clk=$(date -d@"${tot_sec}" -u +%M:%S.%2N)
 		printf "%4d%7d%8.2f%11s\n" "$i" "$tot_frm" "$tot_sec" "$tot_clk"
 	done
@@ -634,7 +634,7 @@ _slow_video() {
 	op_total_frames=$(echo "scale=0;($timesN*$frm)/1"|bc -l) # Output video total frames.
 	op_mid_mfps=$(echo "$timesN*$fps"|bc -l) # Required minterpolate fps (float).
 	op_total_mfps=$(printf "%.f" "${op_mid_mfps}") # Output minterpolate fps (round).
-	op_total_sec=$(echo "scale=2;$op_total_frames/$fps"|bc -l) # Output total seconds.
+	op_total_sec=$(printf "%.2f" $(echo "scale=2;$op_total_frames/$fps"|bc -l)) # Output total seconds.
 	op_total_clk=$(date -d@"${op_total_sec}" -u +%M:%S.%2N) # output total time in clock.
 	output="_S${input}_$(date +%H%M%S)_${timesN}_${op_total_sec}.avi" # Output raw avi filename.
 
@@ -651,7 +651,7 @@ _slow_video() {
 		-sn -map_chapters -1 \
 		-f avi "${output}"
 	_draw_line "-"
-	echo "%%% TARGET: ${output}, ${op_total_mfps} mfps, ${op_total_frames} frames, ${op_total_clk} duration. "
+	echo "TARGET: ${output}, ${op_total_mfps} mfps, ${op_total_frames} frames, ${op_total_clk} duration. "
 
 	# Start encoding slowmotion video
 	time ffmpeg -v error -hide_banner -stats \
