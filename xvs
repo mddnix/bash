@@ -142,7 +142,7 @@ _cnct_video() {
 	done
 	echo "TOTAL: ${secs}"
 	files=${files#|*} # Remove '|' at beginning.
-	output="_C$(date +%H%M%S).${extn#*.}" # Concatenated output filename.
+	output="_C$(date +%H%M%S).${extn##*.}" # Concatenated output filename.
 
 	# Print output command for reference
 	_draw_line "-"
