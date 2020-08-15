@@ -83,6 +83,7 @@ Options:
     [file]... -a [audio] -v [volume]               Join. Join video/audio file with volume.
     [file]... -a [audio] -f [fadeout]              Join. Join video/audio with fadeout.
     [file]... -a [audio] -v [volume] -f [fadeout]  Join. Join video/audio with volume and fadeout.
+ -k [file] -X [00:00:00] -Y [secs] -M [map]        Katri. Trim video.
  -m [xn]                                           Mount. Mounts LUKS partition into directory.
  -r [file]                                         Raw. Encode any video to rawvideo.
  -s [file]                                         Slow. Create slowmotion video.
@@ -461,26 +462,47 @@ _join_video() {
 }
 
 ###################################################################################################
-# Clips a part of video.
-# $1: Array of start and end points.
+# Trims a part of video.
+# $1: (-k) Input file name.
+# $2: (-X) Start of Trim.
+# $3: (-Y) End of trim.
+# $4: (-M) Audio map.
 # Return:
 #   Clipped video
 ###################################################################################################
 _katri_video() {
-	local in_video="$1"
-	local extn="${in_video##*.}"
-	local in_clip="$2"
-	read -r -a array <<< "$in_clip"
-	local krnd="_K$RANDOM.${extn}"
+	local in_video="$1"                    # Input video file.
+	local in_start="$2"                    # Start of clip time.
+	local in_end="$3"                      # End of clip time.
+	local in_map="$4"                      # Audio map.
+	local extn="${in_video##*.}"           # Extension type.
+	local krnd="_K$(date +%H%M%S).${extn}" # Output filename.
 
-	ffmpeg -v info -hide_banner -stats \
+	_draw_line '-'
+	echo ffmpeg -v info -hide_banner -stats \
+		-ss "${in_start}" \
 		-i "${in_video}" \
-		-ss "${array[0]}" \
-		-to "${array[1]}" \
+		-t "${in_end}" \
 		-c:v copy \
 		-c:a copy \
-		-map 0:0 \
-		-map "${array[2]}" \
+		-avoid_negative_ts 1 \
+		-map "0:0" \
+		-map "${in_map}" \
+		-sn \
+		-map_chapters -1 \
+		"${krnd}"
+	_draw_line '-'
+
+	# start of trimming
+	ffmpeg -v info -hide_banner -stats \
+		-ss "${in_start}" \
+		-i "${in_video}" \
+		-t "${in_end}" \
+		-c:v copy \
+		-c:a copy \
+		-avoid_negative_ts 1 \
+		-map "0:0" \
+		-map "${in_map}" \
 		-sn \
 		-map_chapters -1 \
 		"${krnd}"
@@ -757,7 +779,7 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":ha:c:d:e:f:i:j:k:m:r:s:tu:v:A:K:T:" opt ; do
+while getopts ":ha:c:d:e:f:i:j:k:m:r:s:tu:v:A:T:X:Y:M:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
 		h) _help_show ;;
@@ -777,8 +799,10 @@ while getopts ":ha:c:d:e:f:i:j:k:m:r:s:tu:v:A:K:T:" opt ; do
 		f) fade_audio="$OPTARG" ;;
 		v) volume="$OPTARG" ;;
 		A) artist_name="$OPTARG" ;;
-		K) Katri_video="$OPTARG" ;;
 		T) title_name="$OPTARG" ;;
+		X) katri_start="$OPTARG" ;;
+		Y) katri_end="$OPTARG" ;;
+		M) katri_map="$OPTARG" ;;
 
 		:) echo "Error: -$OPTARG requires an argument" ; exit 1 ;;
 		?) echo "Error: unknown option -$OPTARG" ; exit 1 ;;
@@ -801,8 +825,8 @@ elif [[ "${#info_video[@]}" -ne 0 ]] ; then # Info Videos function.
 elif [[ "${#join_video[@]}" -ne 0 ]] ; then # Join Videos.
 	_join_video "${audio_file}" "${volume}" "${fade_audio}" "${join_video[@]}"
 
-elif [[ -n "${katri_video}" && -n "${Katri_video}" ]] ; then # Clip Videos.
-	_katri_video "${katri_video}" "${Katri_video}"
+elif [[ -n "${katri_video}" && -n "${katri_start}" && -n "${katri_end}" && -n "${katri_map}" ]] ; then # Clip Videos.
+	_katri_video "${katri_video}" "${katri_start}" "${katri_end}" "${katri_map}"
 
 elif [[ -n "${mount_dir}" ]] ; then # Mount device into a folder.
 	_mount_dir "${mount_dir}"
