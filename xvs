@@ -395,6 +395,14 @@ _join_video() {
 	shift 3               # Move to next 3 argument.
 	local in_video=("$@") # Array of video filenames.
 
+	# If the filenames are given in XX...XX format
+	if [[ ${in_video[0]} =~ [0-9][0-9]\.\.\.[0-9][0-9] ]] ; then
+		echo 'your in if loop'
+		first="${in_video[0]:0:2}" 
+		last="${in_video[0]:5:2}" 
+		in_video=( $(_gen_filename "${first}" "${last}") ) # call _gen_filename function
+	fi
+
 	declare -a get_video_info=()
 	local ctr=1
 	local files=    # Holds concatenated file name(s).
