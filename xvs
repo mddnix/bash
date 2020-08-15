@@ -93,15 +93,42 @@ HELP
 }
 
 ###################################################################################################
+# Joins file names.
+# Arguments:
+#   $1: Start numnber.
+#   $2: Last numnber.
+# Return:
+#   Joined filename.
+###################################################################################################
+_gen_filename() {
+	local allfiles=""
+	for i in $(seq -f "%02g" $1 $2) ; do
+		allfiles="${allfiles} $i.avi"
+	done
+	echo "${allfiles# }"
+}
+
+###################################################################################################
 # Concatenate one or several videos.
 # Arguments:
-#   $1...: Array of input video file.
+#   $1...: (-c) Array of input video file.
 # Return:
 #   Concatenated video file.
 ###################################################################################################
 _cnct_video() {
-	local files=
-	local extn="$1"
+	local files=( "$@" )
+	local first=
+	local last=
+
+	# If the filenames are given in XX...XX format
+	if [[ ${files[0]} =~ [0-9][0-9]\.\.\.[0-9][0-9] ]] ; then
+		echo 'your in if loop'
+		first="${files[0]:0:2}" 
+		last="${files[0]:5:2}" 
+		files=( $(_gen_filename "${first}" "${last}") ) # call _gen_filename function
+	fi
+
+	local extn="${files[0]}"
 	local tmp_file=
 	local output=
 	local ctr=1
@@ -113,7 +140,7 @@ _cnct_video() {
 	tmp_file="__XVSCNT$RANDOM.txt" # Temporary file.
 
 	# Club video filenames with '|' inbetween them.
-	for i ; do
+	for i in "${files[@]}" ; do
 		get_video_info=( $(mediainfo --fullscreen \
 			--Inform="Video;%DisplayAspectRatio/String% %FrameRate% %Format% %Duration%" "$i") )
 		
@@ -143,7 +170,7 @@ _cnct_video() {
 	done
 	echo "TOTAL: ${secs}"
 	files=${files#|*} # Remove '|' at beginning.
-	output="_C$(date +%H%M%S).${extn##*.}" # Concatenated output filename.
+	output="_C$(date +%d%H%M%S).${extn##*.}" # Concatenated output filename.
 
 	# Print output command for reference
 	_draw_line "-"
@@ -380,7 +407,7 @@ _join_video() {
 	local output=   # Joined avi output filename.
 
 	tmp_file="__XVSJOIN$RANDOM.txt" # Temporary file.
-	output="_J$(date +%H%M%S).avi" # Output joined video filename.
+	output="_J$(date +%d%H%M%S).avi" # Output joined video filename.
 
 	# Find duration of all videos + Join video filenames with '|' inbetween them.
 	for i in "${in_video[@]}" ; do
@@ -476,7 +503,7 @@ _katri_video() {
 	local in_end="$3"                      # End of clip time.
 	local in_map=                          # Audio map.
 	local extn="${in_video##*.}"           # Extension type.
-	local krnd="_K$(date +%H%M%S).${extn}" # Output filename.
+	local krnd="_K$(date +%d%H%M%S).${extn}" # Output filename.
 
 	_info_video "${in_video}" # Show video info
 
@@ -582,7 +609,7 @@ _mount_dir() {
 _raw_video() {
 	local input="$1"
 	local output=
-	output="_R$(date +%H%M%S).avi" # Output rawvideo filename.
+	output="_R$(date +%d%H%M%S).avi" # Output rawvideo filename.
 
 	_draw_line "-"
 	echo ffmpeg -v error -hide_banner -stats \
@@ -662,7 +689,7 @@ _slow_video() {
 	op_total_mfps=$(printf "%.f" "${op_mid_mfps}") # Output minterpolate fps (round).
 	op_total_sec=$(printf "%.2f" $(echo "scale=2;$op_total_frames/$fps"|bc -l)) # Output total seconds.
 	op_total_clk=$(date -d@"${op_total_sec}" -u +%M:%S.%2N) # output total time in clock.
-	output="_S${input}_$(date +%H%M%S)_${timesN}_${op_total_sec}.avi" # Output raw avi filename.
+	output="_S${input}_$(date +%d%H%M%S)_${timesN}_${op_total_sec}.avi" # Output raw avi filename.
 
 	# Print output file details.
 	echo
