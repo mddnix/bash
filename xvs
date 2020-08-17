@@ -37,6 +37,7 @@ audio_file=
 fade_audio=
 volume=
 raw_video=
+reverse_video=
 artist_name=
 title_name=
 encode_video=
@@ -86,6 +87,7 @@ Options:
  -k [file] -X [00:00:00] -Y [secs]                 Katri. Trim video.
  -m [xn]                                           Mount. Mounts LUKS partition into directory.
  -r [file]                                         Raw. Encode any video to rawvideo.
+ -R [file]                                         Reverse. Reverse any video.
  -s [file]                                         Slow. Create slowmotion video.
  -t                                                Tags. Display metadata tags.
  -u [xn]                                           Umount. Unmount LUKS partition from directory.
@@ -93,10 +95,9 @@ HELP
 }
 
 ###################################################################################################
-# Joins file names.
+# Generates filenames when input is given as 01...05.
 # Arguments:
-#   $1: Start numnber.
-#   $2: Last numnber.
+#   $1: Start and end of filenames like 01...09. No optarg.
 # Return:
 #   Joined filename.
 ###################################################################################################
@@ -196,7 +197,7 @@ _cnct_video() {
 ###################################################################################################
 # Duration of videos.
 # Arguments:
-#   $1...: Array of input video file.
+#   $1...: (-d) Array of input video file.
 # Return:
 #   Duration of all video file combined.
 ###################################################################################################
@@ -231,9 +232,9 @@ _dur_video() {
 ###################################################################################################
 # Encodes video into 10bit HEVC.
 # Arguments:
-#   $1: Input video name.
-#   $2: Artist.
-#   $3: Title.
+#   $1: (-e) Input video name.
+#   $2: (-A) Artist.
+#   $3: (-T) Title.
 # Return:
 #   A 10bit HEVC video.
 ###################################################################################################
@@ -285,7 +286,6 @@ _encode_video() {
 		the_tags=""
 	fi
 
-
 	# Get aspect ratio from user.
 	echo
 	echo "Choose Aspect Ration:"
@@ -318,7 +318,6 @@ _encode_video() {
 	fi
 
 	# Get CRF value.
-	echo
 	read -r -p 'Set crf to 23?: ' crf_value
 	if [[ -z ${crf_value} ]] ; then
 		crf_value=23
@@ -366,7 +365,7 @@ _encode_video() {
 ###################################################################################################
 # Shows short info of video file(s).
 # Arguments:
-#   $1...: Array of video filenames
+#   $1...: (-i) Array of video filenames
 # Return:
 #   Short info of video file(s).
 ###################################################################################################
@@ -381,10 +380,10 @@ _info_video() {
 ###################################################################################################
 # Join video(s) with audio.
 # Arguments:
-#   $1: Audio file.
-#   $2: Volume level.
-#   $3: Fadeout seconds.
-#   $4...: Video file(s).
+#   $1: (-a) Audio file.
+#   $2: (-v) Volume level.
+#   $3: (-f) Fadeout seconds.
+#   $4...: (-j) Video file(s).
 # Return:
 #   Joined video witj custom audio file.
 ###################################################################################################
@@ -547,9 +546,10 @@ _katri_video() {
 		"${krnd}"
 }
 
-
 ###################################################################################################
 # Mounts the LUKS partition into a directory. Creates directory if necessary.
+# Arguments:
+#   $1: (-m) {x,n}
 # Globals/Constants:
 #   XDEV, XDIR, XMAP, XUSR, NDEV, NDIR, NMAP, NUSR
 ###################################################################################################
@@ -610,14 +610,14 @@ _mount_dir() {
 ###################################################################################################
 # Raw video.
 # Arguments:
-#   $1: Input video file.
+#   $1: (-r) Input video file.
 # Return:
 #   Rawvideo.
 ###################################################################################################
 _raw_video() {
 	local input="$1"
 	local output=
-	output="_R$(date +%d%H%M%S).avi" # Output rawvideo filename.
+	output="_r$(date +%d%H%M%S).avi" # Output rawvideo filename.
 
 	_draw_line "-"
 	echo ffmpeg -v error -hide_banner -stats \
@@ -637,9 +637,41 @@ _raw_video() {
 }
 
 ###################################################################################################
+# Reverse video.
+# Arguments:
+#   $1: (-R) Input video file.
+# Return:
+#   Reversed rawvideo.
+###################################################################################################
+_reverse_video() {
+	local output=
+	output="_R$(date +%d%H%M%S).avi" # Output rawvideo filename.
+
+	_draw_line "-"
+	echo ffmpeg -v error -hide_banner -stats \
+		-i "$1" \
+		-f lavfi -i anullsrc -shortest \
+		-c:v rawvideo -vtag YV12 -vf "reverse,format=yuv420p,shuffleplanes=0:2:1" \
+		-c:a pcm_s16le -ar 48000 -ac 2 \
+		-map 0:v -map 1:a \
+		-f avi "${output}"
+	_draw_line "-"
+
+	ffmpeg -v error -hide_banner -stats \
+		-i "$1" \
+		-f lavfi -i anullsrc -shortest \
+		-c:v rawvideo -vtag YV12 -vf "reverse,format=yuv420p,shuffleplanes=0:2:1" \
+		-c:a pcm_s16le -ar 48000 -ac 2 \
+		-map 0:v -map 1:a \
+		-f avi "${output}"
+
+	sync
+}
+
+###################################################################################################
 # Slows down video file.
 # Arguments:
-#   $1: Input video file.
+#   $1: (-s) Input video file.
 # Return:
 #   Slowmotion video file
 ###################################################################################################
@@ -712,7 +744,7 @@ _slow_video() {
 		-sn -map_chapters -1 \
 		-f avi "${output}"
 	_draw_line "-"
-	echo "TARGET: ${output}, ${op_total_mfps} mfps, ${op_total_frames} frames, ${op_total_clk} duration. "
+	echo "TARGET: ${output}, ${op_total_mfps} mfps, $(_to_color "${op_total_frames}" "yellow") frames, $(_to_color "${op_total_clk}" "yellow") duration. "
 
 	# Start encoding slowmotion video
 	time ffmpeg -v error -hide_banner -stats \
@@ -767,6 +799,8 @@ EOF
 
 ###################################################################################################
 # Unmounts the LUKS partition from a directory.
+# Arguments:
+#   $1: (-u) {x,n}
 # Globals/Constants:
 #   XDEV, XDIR, XMAP, XUSR, NDEV, NDIR, NMAP, NUSR
 ###################################################################################################
@@ -818,7 +852,7 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":ha:c:d:e:f:i:j:k:m:r:s:tu:v:A:T:X:Y:" opt ; do
+while getopts ":ha:c:d:e:f:i:j:k:m:r:R:s:tu:v:A:T:X:Y:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
 		h) _help_show ;;
@@ -830,6 +864,7 @@ while getopts ":ha:c:d:e:f:i:j:k:m:r:s:tu:v:A:T:X:Y:" opt ; do
 		k) katri_video="$OPTARG" ;;
 		m) mount_dir="$OPTARG" ;;
 		r) raw_video="$OPTARG" ;;
+		R) reverse_video="$OPTARG" ;;
 		s) slow_video="$OPTARG" ;;
 		t) _tags_list ;;
 		u) umount_dir="$OPTARG" ;;
@@ -871,6 +906,9 @@ elif [[ -n "${mount_dir}" ]] ; then # Mount device into a folder.
 
 elif [[ -n "${raw_video}" ]] ; then # Convert to rawvideo.
 	_raw_video "${raw_video}"
+
+elif [[ -n "${reverse_video}" ]] ; then # Reverse rawvideo.
+	_reverse_video "${reverse_video}"
 
 elif [[ -n "${slow_video}" ]] ; then # Slowmotion video
 	_slow_video "${slow_video}"

@@ -21,9 +21,11 @@ shift "$((OPTIND-1))"
 extn="${in_file##*.}"
 out_file="_M$(date +%H%M%S).${extn}" # Concatenated output filename.
 
-python3 "/opt/Super-SloMo/video_to_slomo.py" \
-	--video="${in_file}" \
-	--sf="${in_timesN}" \
-	--checkpoint="/opt/Super-SloMo/SuperSloMo.ckpt" \
-	--fps="${in_fps}" \
-	--output="${out_file}"
+if [[ -n "${in_file}" ]] ; then
+	time python3 "/opt/Super-SloMo/video_to_slomo.py" \
+		--video="${in_file}" \
+		--sf="${in_timesN}" \
+		--checkpoint="/opt/Super-SloMo/SuperSloMo.ckpt" \
+		--fps="${in_fps}" \
+		--output="${out_file}"
+fi
