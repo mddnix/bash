@@ -159,7 +159,7 @@ EncodeToHEVC() {
 			
 			#Valid presets are ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow and placebo.
 			$FF -v error -hide_banner -stats -i "$FILE" \
- 			  -c:v libx265 -crf:v 25 -preset superfast -pix_fmt yuv444p10le -x265-params log-level=error \
+ 			  -c:v libx265 -crf:v 28 -preset superfast -pix_fmt yuv444p10le -x265-params log-level=error \
 			  -c:a aac -threads 0 \
 			  -f mp4 "$outputFileName"
 			

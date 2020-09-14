@@ -264,13 +264,13 @@ _encode_video() {
 	# Change case of artist
 	artist_to_pascal="$(_to_pascal "${in_artist}")"
 	artist_to_lower="$(_to_lower "${in_artist}")"
-	artist_to_lower="${artist_to_lower/ /_}"
+	artist_to_lower="${artist_to_lower// /_}"
 
 	# Change case of title
 	if [[ -n "${in_title}" ]] ; then
 		title_to_pascal="$(_to_pascal "${in_title}")"
 		title_to_lower="$(_to_lower "${in_title}")"
-		title_to_lower="-${title_to_lower/ /_}"
+		title_to_lower="-${title_to_lower// /_}"
 	else
 		title_to_pascal=""
 		title_to_lower=""
@@ -319,9 +319,9 @@ _encode_video() {
 	fi
 
 	# Get CRF value.
-	read -r -p 'Set crf to 23?: ' crf_value
+	read -r -p 'Set crf to 25?: ' crf_value
 	if [[ -z ${crf_value} ]] ; then
-		crf_value=23
+		crf_value=25
 	fi
 	echo "Selected CRF: ${crf_value}"
 
