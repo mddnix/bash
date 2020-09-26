@@ -124,7 +124,6 @@ _cnct_video() {
 
 	# If the filenames are given in XX...XX format
 	if [[ ${files[0]} =~ [0-9][0-9]\.\.\.[0-9][0-9] ]] ; then
-		echo 'your in if loop'
 		first="${files[0]:0:2}" 
 		last="${files[0]:5:2}" 
 		files=( $(_gen_filename "${first}" "${last}") ) # call _gen_filename function
