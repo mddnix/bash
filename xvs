@@ -16,8 +16,8 @@ set -o errexit # Exit script when command fails. Add '|| true' to allow fail.
 # Constant variables
 # ------------------
 readonly SCRIPT_NAME="$(basename "$0")"
-readonly XDIR="/xd"
-readonly NDIR="/nd"
+readonly XDIR="/dx"
+readonly NDIR="/dn"
 readonly XDEV="/dev/sda5"
 readonly NDEV="/dev/sda9"
 readonly XMAP="XDDM"
