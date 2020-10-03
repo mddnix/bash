@@ -1,8 +1,8 @@
 #!/bin/bash
 
-if [[ -d /xd/apps/jd2 ]] ; then
+if [[ -d /dx/apps/jd2 ]] ; then
 	# Run JDownloader
-	/bin/sh "/xd/apps/jd2/JDownloader2"
+	/bin/sh "/dx/apps/jd2/JDownloader2"
  else
 	echo "Dungeon Closed. No JDownloader"
 	notify-send "Dungeon Closed. No JDownloader"
