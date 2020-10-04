@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Script Name : snapit
+# Version     : 1.0
+# Description : Creates/Merges/Removes snapshot of root and home volume.
+# Args        : Refer HELP section for usage.
+# Author      : Madhusudhan D Desai
+# Email       : mddnix@gmail.com
+
+### Bash shell options
+set -o nounset # Exit when script tries to use undeclared variables.
+set -o errexit # Exit script when command fails. Add '|| true' to allow fail.
+
+### Trap
+_trap_cleanup() {
+        echo "Oops! $(basename "$0") ($$) has terminated."
+        exit 2
+}
+trap '_trap_cleanup' SIGHUP SIGINT SIGQUIT SIGQUIT SIGTERM
+
+### Help.
+_help_show() {
+cat <<HELP
+Usage:
+ snapit [-c | -m | -d ]
+
+Options:
+ -h  Show this help.
+
+ -c  Create snapshots.
+ -m  Merge  snapshots.
+ -d  Delete snapshots.
+HELP
+}
+
+### Create Snapshots
+create_snapshots() {
+	echo "Creating snaps"
+	sudo lvs
+	sudo lvcreate -n snap-root -L1G -s /dev/vgh/root
+	sudo lvcreate -n snap-home -L1G -s /dev/vgh/home
+	sudo lvs
+}
+
+### Merge Snapshots
+merge_snapshots() {
+	echo "Merging snaps"
+	sudo lvs
+	sudo lvconvert --merge /dev/vgh/snap-root
+	sudo lvconvert --merge /dev/vgh/snap-home
+	sudo lvs
+}
+
+### Delete Snapshots
+delete_snapshots() {
+	echo "Deleting snaps"
+	sudo lvs
+	sudo lvremove /dev/vgh/snap-root
+	sudo lvremove /dev/vgh/snap-home
+	sudo lvs
+}
+
+### Main Function
+while getopts "hcmd" opt ; do
+        case $opt in
+                h) _help_show ;;
+				c) create_snapshots ;;
+				m) merge_snapshots ;;
+				d) delete_snapshots ;;
+                ?) echo "Error: unknown option -$OPTARG" ; exit 1 ;;
+        esac
+done
+shift "$((OPTIND-1))"
+
