@@ -36,8 +36,10 @@ HELP
 create_snapshots() {
 	echo "Creating snaps"
 	sudo lvs
+	echo
 	sudo lvcreate -n snap-root -L1G -s /dev/vgh/root
 	sudo lvcreate -n snap-home -L1G -s /dev/vgh/home
+	echo
 	sudo lvs
 }
 
@@ -45,8 +47,10 @@ create_snapshots() {
 merge_snapshots() {
 	echo "Merging snaps"
 	sudo lvs
+	echo
 	sudo lvconvert --merge /dev/vgh/snap-root
 	sudo lvconvert --merge /dev/vgh/snap-home
+	echo
 	sudo lvs
 }
 
@@ -54,8 +58,10 @@ merge_snapshots() {
 delete_snapshots() {
 	echo "Deleting snaps"
 	sudo lvs
+	echo
 	sudo lvremove /dev/vgh/snap-root
 	sudo lvremove /dev/vgh/snap-home
+	echo
 	sudo lvs
 }
 
