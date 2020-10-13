@@ -583,7 +583,8 @@ _mount_dir() {
 	fi
 
 	# Check if LUKS device already mounted into a directory.
-	if [[ $(findmnt -M "${dir_name}") ]] ; then
+	#if [[ $(findmnt -M "${dir_name}") ]] ; then
+	if [[ $(findmnt "${dir_name}") ]] ; then
 		echo "${dir_name} already mounted with ${dev_name}. Doing nothing."
 		exit 1
 	else
@@ -829,7 +830,8 @@ _umount_dir() {
 	fi
 
 	# Check if directory is already mounted.
-	if [[ $(findmnt -M "${dir_name}") ]] ; then
+	#if [[ $(findmnt -M "${dir_name}") ]] ; then
+	if [[ $(findmnt "${dir_name}") ]] ; then
 		echo "Unmounting ${dir_name}..."
 
 		# Check if the mount directory is busy
