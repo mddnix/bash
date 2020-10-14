@@ -20,8 +20,8 @@ readonly XDIR="/dx"
 readonly NDIR="/dn"
 readonly XDEV="/dev/sda5"
 readonly NDEV="/dev/sda9"
-readonly XMAP="XDDM"
-readonly NMAP="NDDM"
+readonly XMAP="DXDM"
+readonly NMAP="DNDM"
 readonly XUSR="neon"
 readonly NUSR="neon"
 
@@ -583,7 +583,6 @@ _mount_dir() {
 	fi
 
 	# Check if LUKS device already mounted into a directory.
-	#if [[ $(findmnt -M "${dir_name}") ]] ; then
 	if [[ $(findmnt "${dir_name}") ]] ; then
 		echo "${dir_name} already mounted with ${dev_name}. Doing nothing."
 		exit 1
@@ -830,7 +829,6 @@ _umount_dir() {
 	fi
 
 	# Check if directory is already mounted.
-	#if [[ $(findmnt -M "${dir_name}") ]] ; then
 	if [[ $(findmnt "${dir_name}") ]] ; then
 		echo "Unmounting ${dir_name}..."
 
