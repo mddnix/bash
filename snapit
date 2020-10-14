@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Script Name : snapit
 # Version     : 1.0
-# Description : Creates/Merges/Removes snapshot of rhel and home volume.
+# Description : Creates/Merges/Removes snapshot of root and home volume.
 # Args        : Refer HELP section for usage.
 # Author      : Madhusudhan D Desai
 # Email       : mddnix@gmail.com
@@ -37,7 +37,7 @@ create_snapshots() {
 	echo "Creating snaps"
 	sudo lvs
 	echo
-	sudo lvcreate -n snap-rhel -L1G -s /dev/vgh/rhel
+	sudo lvcreate -n snap-root -L1G -s /dev/vgh/root
 	sudo lvcreate -n snap-home -L1G -s /dev/vgh/home
 	echo
 	sudo lvs
@@ -48,7 +48,7 @@ merge_snapshots() {
 	echo "Merging snaps"
 	sudo lvs
 	echo
-	sudo lvconvert --merge /dev/vgh/snap-rhel
+	sudo lvconvert --merge /dev/vgh/snap-root
 	sudo lvconvert --merge /dev/vgh/snap-home
 	echo
 	sudo lvs
@@ -59,7 +59,7 @@ delete_snapshots() {
 	echo "Deleting snaps"
 	sudo lvs
 	echo
-	sudo lvremove /dev/vgh/snap-rhel
+	sudo lvremove /dev/vgh/snap-root
 	sudo lvremove /dev/vgh/snap-home
 	echo
 	sudo lvs
