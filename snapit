@@ -39,7 +39,6 @@ create_snapshots() {
 	echo
 	sudo lvcreate -n snap-root -L1G -s /dev/vgh/root
 	sudo lvcreate -n snap-home -L1G -s /dev/vgh/home
-	sudo lvcreate -n snap-var -L1G -s /dev/vgh/var
 	echo
 	sudo lvs
 }
@@ -51,7 +50,6 @@ merge_snapshots() {
 	echo
 	sudo lvconvert --merge /dev/vgh/snap-root
 	sudo lvconvert --merge /dev/vgh/snap-home
-	sudo lvconvert --merge /dev/vgh/snap-var
 	echo
 	sudo lvs
 }
@@ -63,7 +61,6 @@ delete_snapshots() {
 	echo
 	sudo lvremove /dev/vgh/snap-root
 	sudo lvremove /dev/vgh/snap-home
-	sudo lvremove /dev/vgh/snap-var
 	echo
 	sudo lvs
 }
