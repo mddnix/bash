@@ -82,8 +82,8 @@ Options:
  -i [file]...                                      Info. Show info of video(s).
  -j [file]... (XX...XX)                            Join. Join video with silent audio.
     [file]... -a [audio]                           Join. Join video with audio file.
-	[file]... -a [audio] -v [volume]               Join. Join video/audio file with volume. (Volume = 0.25, 0.5, 1, 1.25, 1.5,...)
-	[file]... -a [audio] -f [fadeout]              Join. Join video/audio with fadeout (in secs). 
+    [file]... -a [audio] -v [volume]               Join. Join video/audio file with volume. (Volume = 0.25, 0.5, 1, 1.25, 1.5,...)
+    [file]... -a [audio] -f [fadeout]              Join. Join video/audio with fadeout (in secs). 
     [file]... -a [audio] -v [volume] -f [fadeout]  Join. Join video/audio with volume and fadeout.
  -k [file] -X [00:00:00] -Y [secs]                 Katri. Trim video.
  -m [xn]                                           Mount. Mounts LUKS partition into directory.
@@ -169,7 +169,8 @@ _cnct_video() {
 		secs=$(echo "scale=2;($secs+$sec)/1"|bc -l)
 		files="$files|$i"
 	done
-	echo "TOTAL: ${secs}"
+	secs_clk=$(date -d@"${secs}" -u +%M:%S.%2N)
+	echo "TOTAL: ${secs}s (${secs_clk})"
 	files=${files#|*} # Remove '|' at beginning.
 	output="_C$(date +%d%H%M%S).${extn##*.}" # Concatenated output filename.
 
@@ -340,6 +341,10 @@ _encode_video() {
 	fi
 
 	echo
+	_info_video "${in_video}"
+	echo
+
+	_draw_line "-"
 	echo time ffmpeg -v error -hide_banner -stats \
 		-i "${in_video}" \
 		-c:v libx265 -crf:v "${crf_value}" -preset "${preset}" ${aspect_ratio} -pix_fmt yuv444p10le \
@@ -347,7 +352,6 @@ _encode_video() {
 		-x265-params log-level=error \
 		-metadata artist="${artist_to_pascal}" -metadata title="${title_to_pascal}" \
 		-f mp4 "${output}"
-
 	_draw_line "-"
 
 	# Start enconding to HEVC
@@ -440,7 +444,9 @@ _join_video() {
 			"${sec}" \
 			"${i}"
 	done
-	echo "TOTAL: ${secs} seconds"
+	secs_clk=$(date -d@"${secs}" -u +%M:%S.%2N)
+	echo "TOTAL: ${secs}s (${secs_clk})"
+
 	files=${files#|*} # Trim beginning | character.
 
 	# Set background audio.
@@ -510,7 +516,7 @@ _katri_video() {
 	local in_end="$3"                      # End of clip time.
 	local in_map=                          # Audio map.
 	local extn="${in_video##*.}"           # Extension type.
-	local krnd="_K$(date +%d%H%M%S).${extn}" # Output filename.
+	local krnd="_K$(date +%m%d-%H%M%S).${extn}" # Output filename.
 
 	_info_video "${in_video}" # Show video info
 
@@ -618,6 +624,8 @@ _raw_video() {
 	local input="$1"
 	local output=
 	output="_r$(date +%d%H%M%S).avi" # Output rawvideo filename.
+
+	_info_video "$input"
 
 	_draw_line "-"
 	echo ffmpeg -v error -hide_banner -stats \
@@ -766,26 +774,25 @@ _slow_video() {
 _tags_list() {
 Tags() {
 cat <<EOF
-U2FsdGVkX1+4Npx8vMn6MJ6ojmoIVjG3squlxKellBMSiHgB63dul+K8eKD3vjlw
-bHb6eg9OAW8uarwLsvmFtwPaFi4MzDrt9CC72PPBL63U/nj3XltYeGmJsAKsh0WN
-CdEaAiFccpmWZB9kUc53wFtRV+tpdxJMGjQ4b0FYXP+lGmiuA0OkESXBhIdUeJHc
-v9DyGsycRBYE2SNEZ7pzOt9uFc9sgha1Dh6FHDhMvVTNwMQic4PW0RCda/Bf3ye6
-N3OYMueHerKoA34qAoVNTXyMAqwy56XN2J/glRnUsJFhDhEB2k6XLH+aIzjqmq+R
-DOK8jbGB0O8FsHx9D5C1GP4ad2vggyFbWbV33iKwS39RozBuf3v+JYuEUMh5FTKd
-C5m6063xP5hBKby08YCZ3kDlKYrtAPghtcTMxIFtycGRO7MZb4m0dM1umkC8+iVQ
-Y7XhxON+2z5dhcQ0aF+cRbn/0GFNBWaCqxOO0vblTCyvvkk1PF8Wx27fiCjHyeVp
-0m1sf9vHAz54xFpZBakMcgEYUP+pS9Eyrr59wevwdtKlogDoFMnqnaujpvTFQWAJ
-suLUX4hLUjLKl/E1KZ7nF3F8W210DV+iPIaRP5kXu2JmaD9Mmk7w7mXFLkRdPgvp
-+dbJXwwg3Ay74UuX2ITDM8PfQubb0hAjDiAaIPrtX4LZYUGaTQ2FyK5CGogB8iLR
-gwSNakNWYk2o7Z2c9rtfLYWDO2FSodDwOGpwqtxsP1H7Cg70mTGrSCQ6co3DCeJI
-4conmeG/ImkJp9bXJSe2kYDVDvH5x0LvbreXWGx1xj0kSkVa05ajMtMmVlmxQdfq
-tm6HL5YUxllZi7YKdzHm2lTtqNVDDDt7aLVz12mZScE=
+U2FsdGVkX1/7hXPlmNVme+DqrpsUMA4hKezpAgToE2t17psMzFZxF9heaHsWsP3e
+1oa/gp+kzhoJzbWRsnVpChXbc/MEWNvHEddGE4NYeWfGV/bSq3JI5MRZioUiEK9J
+AAPUcID4fB2W4JqpmSwzXSlG/hNW/oevYgUCPTwK6xv5l30AiAUiwLJkDyRE2UHk
+a4FVSmnHgSvyCBC9cYz93873aUeK2jaP2GxkGgqX9D7TTY83UrjLKW7FQn4BZ/EE
+dtHtd7e1poyyVwO6ldAYFqnTn7U+EMldbuTUuwUaqSUsoGdd1CuoGo1KSN9nOzvw
+osBwqGPOCyztqDklltWNzdUqVFLutciwxXCw1dhAImiQ0hbAm1kE/E8MWJ+k1mBA
+aeaZbmLeHAmjliwXDYF1HpVFmDQZQeWO56Rrc4O5S7UpfjCLR/c0fe60ZKPcZXo9
+HwtikkjbYbrzmYutDNqQwFl8U+rw9nDWwlMw/5PGPD6ZGgwNjGZrL8Cp99NpHzFU
+kgJGogzoQZ9fG7A9/CWunU68dbGdK75hi2fhoH9dXaTIYgOf1gEq+kq/s1vFe2sp
+1YOBN/39oRJgKPNeK55eaDXNXWiHj4wnrW1EAOnqB/8RiTggUjnfBA5jhPG9wtIy
+nzhr2SE2owAYYHZvXSPHWEkiqw9M1q6TzAloA4gOTdwdr4sJ341CEkwdkOSw8UBr
+p2OyzaJyALLCVUSXU2jgz/UktbFYA9/+h9F8VrZ1uwMqoyGJ6Di0OwGcVDj8ty9p
+hmV6way9und8mXH+pIKO3A==
 EOF
 }
 
 	# Store decrypted tags in valriable. Needs password.
 	local var_tags=
-	var_tags=$(Tags | openssl aes-256-cbc -md sha256 -salt -pbkdf2 -iter 1024 -a -d 2>/dev/null)
+	var_tags=$(Tags | openssl aes-256-cbc -md sha256 -salt -pbkdf2 -iter 3072 -a -d 2>/dev/null)
 	if [[ "${var_tags}" =~ Birthday ]] ; then
 		echo
 		_title_header "$(_to_upper 'Available Tags')" '>' '<'
