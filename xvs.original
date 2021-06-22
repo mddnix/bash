@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Script Name : xvs
-# Version     : 1.2
+# Version     : 1.1
 # Description : Provides various features to manipulate a video file.
 # Args        : Refer HELP section for usage.
 # Author      : Madhusudhan D Desai
@@ -17,8 +17,11 @@ set -o errexit # Exit script when command fails. Add '|| true' to allow fail.
 # ------------------
 readonly SCRIPT_NAME="$(basename "$0")"
 readonly XDIR="/xd"
+readonly NDIR="/dn"
 readonly XDEV="/dev/sda5"
-readonly XMAP="XVS"
+readonly NDEV="/dev/sda10"
+readonly XMAP="XD"
+readonly NMAP="XN"
 readonly XUSR="neon"
 readonly NUSR="neon"
 
@@ -558,10 +561,21 @@ _katri_video() {
 ###################################################################################################
 _mount_dir() {
 
-	local dev_name="${XDEV}"
-	local dir_name="${XDIR}"
-	local map_name="${XMAP}"
-	local usr_name="${XUSR}"
+	# Check if $1 has correct values - x or n.
+	if [[ "$1" = "x" ]] ; then
+		local dev_name="${XDEV}"
+		local dir_name="${XDIR}"
+		local map_name="${XMAP}"
+		local usr_name="${XUSR}"
+	elif [[ "$1" = "n" ]] ; then
+		local dev_name="${NDEV}"
+		local dir_name="${NDIR}"
+		local map_name="${NMAP}"
+		local usr_name="${NUSR}"
+	else
+		echo "Couldn't find mount code... exiting."
+		exit 1
+	fi
 
 	# Check if mount directory already (not) exist.
 	if [[ ! -d "${dir_name}" ]] ; then
@@ -799,10 +813,21 @@ EOF
 ###################################################################################################
 _umount_dir() {
 
-	local dev_name="${XDEV}"
-	local dir_name="${XDIR}"
-	local map_name="${XMAP}"
-	local usr_name="${XUSR}"
+	# Check if $1 has correct values - x or n.
+	if [[ "$1" = "x" ]] ; then
+		local dev_name="${XDEV}"
+		local dir_name="${XDIR}"
+		local map_name="${XMAP}"
+		local usr_name="${XUSR}"
+	elif [[ "$1" = "n" ]] ; then
+		local dev_name="${NDEV}"
+		local dir_name="${NDIR}"
+		local map_name="${NMAP}"
+		local usr_name="${NUSR}"
+	else
+		echo "Couldn't find mount code... exiting."
+		exit 1
+	fi
 
 	# Check if are unmounting from source directory.
 	if [[ "$PWD" = "${dir_name}" ]] ; then
@@ -834,7 +859,7 @@ _umount_dir() {
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%% Main Function
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while getopts ":ha:c:d:e:f:i:j:k:mr:R:s:tuv:A:T:X:Y:" opt ; do
+while getopts ":ha:c:d:e:f:i:j:k:m:r:R:s:tu:v:A:T:X:Y:" opt ; do
 	#echo "Processing $opt : OPTIND is $OPTIND"
 	case $opt in
 		h) _help_show ;;
@@ -844,12 +869,12 @@ while getopts ":ha:c:d:e:f:i:j:k:mr:R:s:tuv:A:T:X:Y:" opt ; do
 		i) info_video+=("$OPTARG") ;;
 		j) join_video+=("$OPTARG") ;;
 		k) katri_video="$OPTARG" ;;
-		m) _mount_dir ;;
+		m) mount_dir="$OPTARG" ;;
 		r) raw_video="$OPTARG" ;;
 		R) reverse_video="$OPTARG" ;;
 		s) slow_video="$OPTARG" ;;
 		t) _tags_list ;;
-		u) _umount_dir ;;
+		u) umount_dir="$OPTARG" ;;
 
 		a) audio_file="$OPTARG" ;;
 		f) fade_audio="$OPTARG" ;;
@@ -883,6 +908,9 @@ elif [[ "${#join_video[@]}" -ne 0 ]] ; then # Join Videos.
 elif [[ -n "${katri_video}" && -n "${katri_start}" && -n "${katri_end}" ]] ; then # Clip Videos.
 	_katri_video "${katri_video}" "${katri_start}" "${katri_end}"
 
+elif [[ -n "${mount_dir}" ]] ; then # Mount device into a folder.
+	_mount_dir "${mount_dir}"
+
 elif [[ -n "${raw_video}" ]] ; then # Convert to rawvideo.
 	_raw_video "${raw_video}"
 
@@ -892,4 +920,6 @@ elif [[ -n "${reverse_video}" ]] ; then # Reverse rawvideo.
 elif [[ -n "${slow_video}" ]] ; then # Slowmotion video
 	_slow_video "${slow_video}"
 
+elif [[ -n "${umount_dir}" ]] ; then # Un Mount device from folder.
+	_umount_dir "${umount_dir}"
 fi
